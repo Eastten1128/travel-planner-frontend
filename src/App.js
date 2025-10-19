@@ -1,24 +1,28 @@
 import logo from './logo.svg';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import './App.css';
 
+import MainA from "./pages/main/Main_page_a";
+import MainB from "./pages/main/Main_page_b";
+import AdditionalInfo from "./pages/exception/AdditionalInfo";
+import LoginError from "./pages/exception/LoginError";
+import { GoogleOAuthProvider } from "@react-oauth/google";
+
 function App() {
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <Router>
+        <Routes>
+          <Route path="/" element={<MainB />} />
+          <Route path="/main_b" element={<MainB/>} />
+          <Route path="/main_a" element={<MainA/>} />
+          <Route path="/additional-info" element={<AdditionalInfo />} />
+          <Route path="/loginError" element={<LoginError />} />
+        </Routes>
+      </Router>
+    </GoogleOAuthProvider>
   );
 }
 
