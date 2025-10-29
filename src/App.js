@@ -1,6 +1,21 @@
+import { useCallback, useState } from 'react';
 import './App.css';
 
 function App() {
+  const [destination, setDestination] = useState('');
+
+  const handleLogin = useCallback(() => {
+    window.location.href = 'http://localhost:8080/oauth2/authorization/google';
+  }, []);
+
+  const handleDestinationChange = useCallback((event) => {
+    setDestination(event.target.value);
+  }, []);
+
+  const handleSearchSubmit = useCallback((event) => {
+    event.preventDefault();
+  }, []);
+
   return (
     <div className="app">
       <header className="navbar">
@@ -9,7 +24,9 @@ function App() {
           <a href="/" className="nav-link">여행지</a>
           <a href="/" className="nav-link">고객지원</a>
           <a href="/" className="nav-link">이용방법</a>
-          <button type="button" className="login-button">로그인</button>
+          <button type="button" className="login-button" onClick={handleLogin}>
+            로그인
+          </button>
         </nav>
       </header>
 
@@ -24,7 +41,7 @@ function App() {
           <p className="hero-description">
             여행의 시작부터 끝까지, 일정을 한눈에 확인하고 팀원과 손쉽게 공유하세요.
           </p>
-          <form className="search-bar" role="search">
+          <form className="search-bar" role="search" onSubmit={handleSearchSubmit}>
             <label htmlFor="destination" className="sr-only">
               여행지 검색
             </label>
@@ -33,6 +50,8 @@ function App() {
               type="search"
               placeholder="어디로 여행을 떠나시나요?"
               aria-label="여행지 검색"
+              value={destination}
+              onChange={handleDestinationChange}
             />
             <button type="submit">플래너 찾기</button>
           </form>
