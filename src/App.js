@@ -1,11 +1,55 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 
-function App() {
-  const isLoggedIn = false;
+const DEFAULT_LOGIN_PATH = '/oauth2/authorization/google';
+const DEFAULT_LOGOUT_REDIRECT = '/';
 
-  const beforeLoginNav = ['여행지', '고객지원', '이용방법'];
-  const afterLoginNav = ['여행지', '고객지원', '이용방법'];
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return Boolean(window.localStorage.getItem('accessToken'));
+  });
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setIsLoggedIn(Boolean(window.localStorage.getItem('accessToken')));
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const loginUrl = useMemo(() => {
+    const baseUrl = process.env.REACT_APP_API_BASE_URL;
+    const configuredUrl = process.env.REACT_APP_GOOGLE_OAUTH_URL;
+
+    if (configuredUrl) {
+      return configuredUrl;
+    }
+
+    if (baseUrl) {
+      return `${baseUrl.replace(/\/?$/, '')}${DEFAULT_LOGIN_PATH}`;
+    }
+
+    return DEFAULT_LOGIN_PATH;
+  }, []);
+
+  const beforeLoginNav = useMemo(() => ['여행지', '고객지원', '이용방법'], []);
+  const afterLoginNav = useMemo(() => ['여행지', '고객지원', '이용방법'], []);
   const navItems = isLoggedIn ? afterLoginNav : beforeLoginNav;
+
+  const handleLogin = useCallback(() => {
+    window.location.href = loginUrl;
+  }, [loginUrl]);
+
+  const handleLogout = useCallback(() => {
+    window.localStorage.removeItem('accessToken');
+    setIsLoggedIn(false);
+
+    const redirectUrl = process.env.REACT_APP_LOGOUT_REDIRECT_URL || DEFAULT_LOGOUT_REDIRECT;
+    if (redirectUrl) {
+      window.location.href = redirectUrl;
+    }
+  }, []);
 
   return (
     <div className="app">
@@ -21,7 +65,11 @@ function App() {
               </li>
             ))}
           </ul>
-          <button type="button" className="login-button">
+          <button
+            type="button"
+            className="login-button"
+            onClick={isLoggedIn ? handleLogout : handleLogin}
+          >
             {isLoggedIn ? '로그아웃' : '로그인'}
           </button>
         </nav>
