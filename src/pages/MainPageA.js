@@ -37,16 +37,24 @@ const AI_RECOMMENDATIONS = [
   },
 ];
 
-function MainPageA({ onNavigate }) {
+function MainPageA({ onNavigateLanding, onLogout }) {
   const handleCreatePlan = useCallback(() => {
     alert('새 여행 플랜 생성은 곧 제공될 예정입니다.');
   }, []);
 
   const handleGoLanding = useCallback(() => {
-    if (onNavigate) {
-      onNavigate('/');
+    if (onNavigateLanding) {
+      onNavigateLanding();
     }
-  }, [onNavigate]);
+  }, [onNavigateLanding]);
+
+  const handleLogout = useCallback(() => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      window.location.href = 'http://localhost:8080/logout';
+    }
+  }, [onLogout]);
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -73,6 +81,9 @@ function MainPageA({ onNavigate }) {
         <div className="top-actions">
           <button type="button" className="ghost-button" onClick={handleCreatePlan}>
             새 플랜 생성
+          </button>
+          <button type="button" className="ghost-button" onClick={handleLogout}>
+            로그아웃
           </button>
           <div className="profile-chip" role="button" tabIndex={0}>
             <span className="profile-avatar" aria-hidden>J</span>
