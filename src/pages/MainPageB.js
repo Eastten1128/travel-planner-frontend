@@ -24,8 +24,7 @@ function MainPageB({ error }) {
       return;
     }
 
-    const redirectUri = encodeURIComponent(window.location.origin);
-    window.location.href = `${API_BASE_URL}/oauth2/authorization/google?redirect_uri=${redirectUri}`;
+    window.location.href = `${API_BASE_URL}/oauth2/authorization/google`;
   }, []);
 
   const handleSearch = useCallback((event) => {

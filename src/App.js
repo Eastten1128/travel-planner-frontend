@@ -91,14 +91,37 @@ function App() {
         credentials: 'include',
       });
 
-      if (!response.ok) {
+      if (response.status === 401) {
         setUser(null);
         setStatus('logged-out');
         return;
       }
 
+      if (response.status === 403) {
+        let data = null;
+
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          console.error('Failed to parse profile response', parseError);
+        }
+
+        setUser(data);
+        setStatus('needs-profile');
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('사용자 정보를 불러오지 못했습니다.');
+      }
+
       const data = await response.json();
       setUser(data);
+
+      const hasNickname =
+        typeof data?.nickname === 'string'
+          ? data.nickname.trim().length > 0
+          : Boolean(data?.nickname);
 
       const statusNeedsProfile =
         needsProfileQuery ||
@@ -107,7 +130,7 @@ function App() {
         truthy(data?.requireProfile) ||
         data?.status === 'INCOMPLETE_PROFILE' ||
         data?.status === 'NEEDS_PROFILE' ||
-        !data?.nickname;
+        !hasNickname;
 
       if (statusNeedsProfile) {
         setStatus('needs-profile');
@@ -134,8 +157,7 @@ function App() {
       return;
     }
 
-    const redirectUri = encodeURIComponent(window.location.origin);
-    window.location.href = `${API_BASE_URL}/logout?redirect_uri=${redirectUri}`;
+    window.location.href = `${API_BASE_URL}/logout`;
   }, []);
 
   if (status === 'loading') {
