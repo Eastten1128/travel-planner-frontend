@@ -1,28 +1,43 @@
-import logo from './logo.svg';
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import './App.css';
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
+import LandingPage from "./pages/landing/LandingPage";
+import OAuthCallback from "./pages/auth/OAuthCallback";
+import OAuthError from "./pages/auth/OAuthError";
+import PlannerListPage from "./pages/planner/PlannerListPage";
+import PlannerDetailPage from "./pages/planner/PlannerDetailPage";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { AuthProvider } from "./context/AuthContext";
 
-import MainA from "./pages/main/Main_page_a";
-import MainB from "./pages/main/Main_page_b";
-import AdditionalInfo from "./pages/exception/AdditionalInfo";
-import LoginError from "./pages/exception/LoginError";
-import { GoogleOAuthProvider } from "@react-oauth/google";
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: "#1a73e8",
+    },
+    secondary: {
+      main: "#0f9d58",
+    },
+  },
+});
 
 function App() {
-  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID;
-
   return (
-    <GoogleOAuthProvider clientId={googleClientId}>
-      <Router>
-        <Routes>
-          <Route path="/" element={<MainB />} />
-          <Route path="/main_b" element={<MainB/>} />
-          <Route path="/main_a" element={<MainA/>} />
-          <Route path="/additional-info" element={<AdditionalInfo />} />
-          <Route path="/loginError" element={<LoginError />} />
-        </Routes>
-      </Router>
-    </GoogleOAuthProvider>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/oauth2/callback" element={<OAuthCallback />} />
+            <Route path="/oauth2/error" element={<OAuthError />} />
+            <Route element={<ProtectedRoute />}> 
+              <Route path="/planners" element={<PlannerListPage />} />
+              <Route path="/planners/:id" element={<PlannerDetailPage />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 
