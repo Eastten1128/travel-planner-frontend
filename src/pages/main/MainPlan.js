@@ -1,0 +1,276 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Button,
+} from "@mui/material";
+import Navbar from "../../components/Navbar/afterLogin/Navbar_a";
+import Footer from "../../components/Footer/Footer";
+import CreatePlan from "../../components/CreatePlan";
+import client from "../../api/client";
+import { getMyPlanners } from "../../api/planner";
+
+const MainPlan = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const [tokenReady, setTokenReady] = useState(false);
+  const [planners, setPlanners] = useState([]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
+
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const token = query.get("token");
+
+    if (token) {
+      localStorage.setItem("accessToken", token);
+      navigate("/main/plan", { replace: true });
+      return;
+    }
+
+    const savedToken = localStorage.getItem("accessToken");
+    if (!savedToken) {
+      alert("로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+
+    setTokenReady(true);
+  }, [location.search, navigate]);
+
+  useEffect(() => {
+    if (!tokenReady) return;
+
+    const fetchUser = async () => {
+      try {
+        const response = await client.get("/user/additionalInfo/check");
+        const user = response?.data || {};
+        if (!user?.name) {
+          setShowAdditionalInfo(true);
+        }
+        if (user?.email) {
+          setUserEmail(user.email);
+        }
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
+          navigate("/login");
+          return;
+        }
+        console.error("사용자 정보 조회 실패:", err);
+      }
+    };
+
+    fetchUser();
+  }, [tokenReady, navigate]);
+
+  const refreshPlanners = useCallback(
+    async (options) => {
+      if (!tokenReady) return;
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const data = await getMyPlanners(options);
+        setPlanners(Array.isArray(data) ? data : []);
+      } catch (err) {
+        const status = err?.response?.status;
+        if (status === 401 || status === 403) {
+          alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
+          navigate("/login");
+          return;
+        }
+        console.error("플래너 목록 조회 실패:", err);
+        setError("플래너 목록을 불러오는 데 실패했습니다. 잠시 후 다시 시도해주세요.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate, tokenReady]
+  );
+
+  useEffect(() => {
+    if (!tokenReady) return;
+    refreshPlanners(userEmail ? { email: userEmail } : undefined);
+  }, [tokenReady, userEmail, refreshPlanners]);
+
+  const handleCreateSuccess = useCallback(
+    (createdPlanner) => {
+      setShowCreate(false);
+      if (createdPlanner && createdPlanner.plannerNo) {
+        setPlanners((prev) => {
+          const filtered = prev.filter((item) => item.plannerNo !== createdPlanner.plannerNo);
+          return [createdPlanner, ...filtered];
+        });
+      } else {
+        refreshPlanners(userEmail ? { email: userEmail } : undefined);
+      }
+    },
+    [refreshPlanners, userEmail]
+  );
+
+  const handleGoToDetail = useCallback(
+    (plannerNo) => {
+      navigate(`/main/plan/detail/${plannerNo}`);
+    },
+    [navigate]
+  );
+
+  const highlightedPlanner = useMemo(() => planners[0] || null, [planners]);
+  const remainingPlanners = useMemo(() => planners.slice(1), [planners]);
+
+  return (
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-gray-100 pb-16">
+        <div className="mx-auto w-full max-w-6xl px-4 py-10">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h1 className="text-2xl font-bold text-gray-900">나의 여행 플래너</h1>
+            <button
+              type="button"
+              className="rounded-full bg-black px-6 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+              onClick={() => setShowCreate(true)}
+            >
+              새 여행 추가
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="mt-12 flex justify-center">
+              <span className="text-sm text-gray-500">플래너 정보를 불러오는 중입니다...</span>
+            </div>
+          ) : error ? (
+            <div className="mt-12 rounded-3xl border border-red-200 bg-red-50 p-8 text-center text-sm text-red-600">
+              {error}
+            </div>
+          ) : planners.length === 0 ? (
+            <div className="mt-12 rounded-3xl border border-dashed border-gray-300 bg-white px-8 py-16 text-center">
+              <p className="text-lg font-semibold text-gray-900">등록된 여행이 없습니다.</p>
+              <p className="mt-2 text-sm text-gray-500">새 여행을 추가하여 여행 계획을 시작해보세요!</p>
+              <button
+                type="button"
+                className="mt-6 rounded-full border border-gray-200 px-6 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                onClick={() => setShowCreate(true)}
+              >
+                새 여행 추가
+              </button>
+            </div>
+          ) : (
+            <div className="mt-10 space-y-8">
+              {highlightedPlanner && (
+                <section className="rounded-3xl bg-white p-8 shadow-sm">
+                  <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-600">예정된 여행</p>
+                      <h2 className="mt-2 text-3xl font-bold text-gray-900">{highlightedPlanner.plannerTitle}</h2>
+                      <p className="mt-3 text-sm text-gray-600">
+                        {highlightedPlanner.plannerStartDay} ~ {highlightedPlanner.plannerEndDay}
+                      </p>
+                      <p className="mt-4 rounded-2xl bg-gray-100 px-4 py-3 text-sm text-gray-500">
+                        여행 설명이 준비 중입니다. 곧 여행 메모를 남길 수 있어요!
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-3 md:w-56">
+                      <button
+                        type="button"
+                        className="rounded-full bg-gray-900 px-6 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                        onClick={() => handleGoToDetail(highlightedPlanner.plannerNo)}
+                      >
+                        여행 정보 수정
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-full border border-gray-300 px-6 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                        title="준비 중인 기능입니다."
+                      >
+                        AI 추천
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              <section className="rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-500 p-10 text-center shadow-sm">
+                <h3 className="text-2xl font-semibold text-white">AI 추천</h3>
+                <p className="mt-3 text-base text-indigo-100">곧 여행 맞춤 추천을 제공해드릴 예정입니다.</p>
+                <button
+                  type="button"
+                  className="mt-6 rounded-full bg-white/90 px-6 py-2 text-sm font-semibold text-indigo-700 shadow"
+                  title="준비 중인 기능입니다."
+                >
+                  준비 중
+                </button>
+              </section>
+
+              {remainingPlanners.length > 0 && (
+                <section className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">다른 여행 계획</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {remainingPlanners.map((planner) => (
+                      <article key={planner.plannerNo} className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                        <div className="flex flex-col gap-4">
+                          <div>
+                            <h4 className="text-xl font-semibold text-gray-900">{planner.plannerTitle}</h4>
+                            <p className="mt-2 text-sm text-gray-600">
+                              {planner.plannerStartDay} ~ {planner.plannerEndDay}
+                            </p>
+                          </div>
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              className="rounded-full bg-gray-900 px-5 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                              onClick={() => handleGoToDetail(planner.plannerNo)}
+                            >
+                              여행 정보 수정
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </div>
+          )}
+        </div>
+      </main>
+
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-2xl">
+            <CreatePlan onSuccess={handleCreateSuccess} onClose={() => setShowCreate(false)} />
+          </div>
+        </div>
+      )}
+
+      <Footer />
+
+      <Dialog open={showAdditionalInfo} onClose={() => setShowAdditionalInfo(false)}>
+        <DialogTitle>추가 정보 입력 필요</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            처음 로그인하신 것 같아요! 닉네임 등 추가 정보를 입력해주세요.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowAdditionalInfo(false)}>닫기</Button>
+          <Button onClick={() => navigate("/additional-info")} variant="contained" color="primary">
+            정보 입력하러 가기
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
+export default MainPlan;
