@@ -45,6 +45,7 @@ const CreatePlan = ({ userId, onSuccess, onClose }) => {
     setSubmitting(true);
     try {
       const newPlanner = await createPlanner({
+        userId,
         plannerTitle: form.plannerTitle.trim(),
         plannerStartday: form.plannerStartday,
         plannerEndday: form.plannerEndday,

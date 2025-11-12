@@ -34,7 +34,7 @@ const PlannerSidebar = ({
     >
       <Stack direction="row" spacing={1} alignItems="center">
         <TextField
-          label="플래너 제목"
+          label="플래너 제"
           value={plannerTitle}
           onChange={handleChangeTitle}
           size="small"

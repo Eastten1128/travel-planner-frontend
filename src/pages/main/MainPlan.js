@@ -168,7 +168,7 @@ const MainPlan = () => {
               </button>
             </div>
           ) : (
-            <div className="mt-10 space-y-8">
+            <div className="mt-10 space-y-8 ">
               {highlightedPlanner && (
                 <section className="rounded-3xl bg-white p-8 shadow-sm">
                   <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
@@ -178,9 +178,7 @@ const MainPlan = () => {
                       <p className="mt-3 text-sm text-gray-600">
                         {highlightedPlanner.plannerStartDate} ~ {highlightedPlanner.plannerEndDate}
                       </p>
-                      <p className="mt-4 rounded-2xl bg-gray-100 px-4 py-3 text-sm text-gray-500">
-                        여행 설명이 준비 중입니다. 곧 여행 메모를 남길 수 있어요!
-                      </p>
+                      
                     </div>
                     <div className="flex flex-col gap-3 md:w-56">
                       <button
@@ -201,18 +199,6 @@ const MainPlan = () => {
                   </div>
                 </section>
               )}
-
-              <section className="rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-500 p-10 text-center shadow-sm">
-                <h3 className="text-2xl font-semibold text-white">AI 추천</h3>
-                <p className="mt-3 text-base text-indigo-100">곧 여행 맞춤 추천을 제공해드릴 예정입니다.</p>
-                <button
-                  type="button"
-                  className="mt-6 rounded-full bg-white/90 px-6 py-2 text-sm font-semibold text-indigo-700 shadow"
-                  title="준비 중인 기능입니다."
-                >
-                  준비 중
-                </button>
-              </section>
 
               {remainingPlanners.length > 0 && (
                 <section className="space-y-4">
