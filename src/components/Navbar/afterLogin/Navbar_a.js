@@ -39,7 +39,7 @@ const Navbar = () => {
   return (
     <AppBar position="sticky" sx={{ backgroundColor: "#000" }}>
       <Toolbar>
-        <Button color="inherit" onClick={() => navigate("/main_a")}>Home</Button>
+        <Button color="inherit" onClick={() => navigate("/main/plan")}>Home</Button>
         <Button color="inherit">KADR25</Button>
         
         <Box position="relative" ml={2}>
