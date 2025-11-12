@@ -19,12 +19,15 @@ import axios from "axios";
 
 // [수정 1] SearchComponent 임포트하기
 // (위에서 생성한 SearchComponent.js 파일의 실제 경로에 맞게 수정하세요)
-import SearchComponent from "../../components/Search/SearchComponent"; 
+import SearchComponent from "../../components/Search/SearchComponent";
+import PlannerSidebar from "../../components/PlannerSidebar/PlannerSidebar";
 
 const MainA = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [openModal, setOpenModal] = useState(false);
+  const [plannerTitle, setPlannerTitle] = useState("");
+  const [todayPlans, setTodayPlans] = useState([]);
 
   // ... (useEffect 및 나머지 로직은 그대로) ...
   useEffect(() => {
@@ -67,14 +70,78 @@ const MainA = () => {
     setOpenModal(false);
     navigate("/additional-info");
   };
+
+    const handleAddPlan = (plan) => {
+    setTodayPlans((prev) => {
+      const exists = prev.some((item) => item.id === plan.id);
+      if (exists) {
+        return prev;
+      }
+      return [...prev, plan];
+    });
+  };
+
+  const handleRemovePlan = (planId) => {
+    setTodayPlans((prev) => prev.filter((plan) => plan.id !== planId));
+  };
+
+  const handleSavePlanner = async () => {
+    if (!plannerTitle.trim()) {
+      alert("플래너 제목을 입력해주세요.");
+      return;
+    }
+
+    if (todayPlans.length === 0) {
+      alert("저장할 일정이 없습니다.");
+      return;
+    }
+
+    const token = localStorage.getItem("accessToken");
+
+    if (!token) {
+      alert("로그인이 필요합니다.");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      await axios.post(
+        "http://localhost:8080/api/planners",
+        {
+          title: plannerTitle,
+          todayPlans,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      alert("플래너가 저장되었습니다.");
+    } catch (error) {
+      console.error("플래너 저장 중 오류:", error);
+      alert("플래너 저장에 실패했습니다.");
+    }
+  };
   // ... (여기까지 로직 동일) ...
 
   return (
     <>
       <Navbar />
       <Container>
-        {/* [수정 2] 비어있던 Container 내부에 SearchComponent를 배치합니다. */}
-        <SearchComponent />
+               <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start", my: 4 }}>
+          <PlannerSidebar
+            plannerTitle={plannerTitle}
+            onTitleChange={setPlannerTitle}
+            todayPlans={todayPlans}
+            onRemove={handleRemovePlan}
+            onSave={handleSavePlanner}
+          />
+          <Box sx={{ flex: 1 }}>
+            <SearchComponent onAddPlan={handleAddPlan} />
+          </Box>
+        </Box>
       </Container>
       <Footer />
 

@@ -7,10 +7,10 @@ import {
   Typography,
   CircularProgress,
   Paper,
-  Avatar
+  Avatar,
 } from '@mui/material';
 
-function SearchComponent() {
+function SearchComponent({ onAddPlan}) {
   // 1. State 설정 (동일)
   const [keyword, setKeyword] = useState('');
   const [tours, setTours] = useState([]);
@@ -73,6 +73,23 @@ function SearchComponent() {
     }
   };
 
+   const handleAddPlan = (tour) => {
+    if (!onAddPlan) {
+      return;
+    }
+
+    const todayPlan = {
+      id: tour.contentid,
+      title: tour.title,
+      address: tour.addr1,
+      image: tour.firstimage,
+      mapX: tour.mapx,
+      mapY: tour.mapy,
+    };
+
+    onAddPlan(todayPlan);
+  };
+
   // 5. JSX 렌더링 (MUI 컴포넌트로 전체 수정)
   return (
     <Box sx={{ my: 4 }}> {/* 전체 컴포넌트 여백 */}
@@ -122,7 +139,7 @@ function SearchComponent() {
       {/* 검색 결과 목록 (데이터 있음) */}
       {!loading && tours.length > 0 && (
         <Box>
-          {tours.map(tour => (
+          {tours.map((tour) => (
             // Paper 컴포넌트를 사용해 각 항목에 테두리와 그림자 효과
             <Paper 
               key={tour.contentid} 
@@ -151,7 +168,7 @@ function SearchComponent() {
               </Avatar>
               
               {/* 2. 텍스트 정보 (이름, 위치 등) */}
-              <Box>
+              <Box sx={{flex: 1, minWidth: 0 }}>
                 <Typography variant="h6" component="h3" sx={{ fontWeight: 'bold' }}>
                   {tour.title}
                 </Typography>
@@ -164,7 +181,22 @@ function SearchComponent() {
                   </Typography>
                 )}
               </Box>
-              <button>추가</button>
+              <Button
+                variant="contained"
+                size="small"
+                sx={{
+                  backgroundColor: '#d71f1c',
+                  '&:hover': {
+                    backgroundColor: '#b81a18',
+                  },
+                  color: '#fff',
+                  ml: 2,
+                  flexShrink: 0,
+                }}
+                onClick={() => handleAddPlan(tour)}
+              >
+                추가
+              </Button>
             </Paper>
           ))}
         </Box>
