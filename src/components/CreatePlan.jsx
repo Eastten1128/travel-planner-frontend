@@ -3,11 +3,11 @@ import { createPlanner } from "../api/planner";
 
 const initialForm = {
   plannerTitle: "",
-  plannerStartDay: "",
-  plannerEndDay: "",
+  plannerStartday: "",
+  plannerEndday: "",
 };
 
-const CreatePlan = ({ onSuccess, onClose }) => {
+const CreatePlan = ({ userId, onSuccess, onClose }) => {
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -26,13 +26,19 @@ const CreatePlan = ({ onSuccess, onClose }) => {
     event.preventDefault();
     setError(null);
 
-    if (!form.plannerTitle.trim() || !form.plannerStartDay || !form.plannerEndDay) {
+    if (!form.plannerTitle.trim() || !form.plannerStartday || !form.plannerEndday) {
       setError("여행명과 시작일, 종료일을 모두 입력해주세요.");
       return;
     }
 
-    if (form.plannerStartDay > form.plannerEndDay) {
+    if (form.plannerStartday > form.plannerEndday) {
       setError("시작일은 종료일보다 이후일 수 없습니다.");
+      return;
+    }
+
+    if (!userId) {
+      setError("사용자 정보를 불러올 수 없습니다. 다시 로그인해 주세요.");
+      alert("사용자 정보를 불러올 수 없습니다. 다시 로그인해 주세요.");
       return;
     }
 
@@ -40,8 +46,8 @@ const CreatePlan = ({ onSuccess, onClose }) => {
     try {
       const newPlanner = await createPlanner({
         plannerTitle: form.plannerTitle.trim(),
-        plannerStartDay: form.plannerStartDay,
-        plannerEndDay: form.plannerEndDay,
+        plannerStartday: form.plannerStartday,
+        plannerEndday: form.plannerEndday,
       });
 
       alert("새 여행이 추가되었습니다.");
@@ -86,8 +92,8 @@ const CreatePlan = ({ onSuccess, onClose }) => {
               <span className="text-sm font-medium text-gray-700">시작일 *</span>
               <input
                 type="date"
-                name="plannerStartDay"
-                value={form.plannerStartDay}
+                name="plannerStartday"
+                value={form.plannerStartday}
                 onChange={handleChange}
                 className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 focus:border-black focus:outline-none"
                 disabled={submitting}
@@ -98,8 +104,8 @@ const CreatePlan = ({ onSuccess, onClose }) => {
               <span className="text-sm font-medium text-gray-700">종료일 *</span>
               <input
                 type="date"
-                name="plannerEndDay"
-                value={form.plannerEndDay}
+                name="plannerEndday"
+                value={form.plannerEndday}
                 onChange={handleChange}
                 className="mt-2 w-full rounded-xl border border-gray-200 px-4 py-3 focus:border-black focus:outline-none"
                 disabled={submitting}

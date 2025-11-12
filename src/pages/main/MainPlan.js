@@ -24,7 +24,7 @@ const MainPlan = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showAdditionalInfo, setShowAdditionalInfo] = useState(false);
-  const [userEmail, setUserEmail] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     const query = new URLSearchParams(location.search);
@@ -56,8 +56,10 @@ const MainPlan = () => {
         if (!user?.name) {
           setShowAdditionalInfo(true);
         }
-        if (user?.email) {
-          setUserEmail(user.email);
+        const resolvedUserId =
+          user?.userId ?? user?.id ?? user?.userid ?? user?.userNo ?? null;
+        if (resolvedUserId !== null && resolvedUserId !== undefined) {
+          setUserId(resolvedUserId);
         }
       } catch (err) {
         const status = err?.response?.status;
@@ -101,8 +103,8 @@ const MainPlan = () => {
 
   useEffect(() => {
     if (!tokenReady) return;
-    refreshPlanners(userEmail ? { email: userEmail } : undefined);
-  }, [tokenReady, userEmail, refreshPlanners]);
+    refreshPlanners(userId ? { userId }: undefined);
+  }, [tokenReady, userId, refreshPlanners]);
 
   const handleCreateSuccess = useCallback(
     (createdPlanner) => {
@@ -113,10 +115,10 @@ const MainPlan = () => {
           return [createdPlanner, ...filtered];
         });
       } else {
-        refreshPlanners(userEmail ? { email: userEmail } : undefined);
+         refreshPlanners(userId ? { userId } : undefined);
       }
     },
-    [refreshPlanners, userEmail]
+    [refreshPlanners, userId]
   );
 
   const handleGoToDetail = useCallback(
@@ -174,7 +176,7 @@ const MainPlan = () => {
                       <p className="text-sm font-semibold text-emerald-600">예정된 여행</p>
                       <h2 className="mt-2 text-3xl font-bold text-gray-900">{highlightedPlanner.plannerTitle}</h2>
                       <p className="mt-3 text-sm text-gray-600">
-                        {highlightedPlanner.plannerStartDay} ~ {highlightedPlanner.plannerEndDay}
+                        {highlightedPlanner.plannerStartDate} ~ {highlightedPlanner.plannerEndDate}
                       </p>
                       <p className="mt-4 rounded-2xl bg-gray-100 px-4 py-3 text-sm text-gray-500">
                         여행 설명이 준비 중입니다. 곧 여행 메모를 남길 수 있어요!
@@ -222,7 +224,7 @@ const MainPlan = () => {
                           <div>
                             <h4 className="text-xl font-semibold text-gray-900">{planner.plannerTitle}</h4>
                             <p className="mt-2 text-sm text-gray-600">
-                              {planner.plannerStartDay} ~ {planner.plannerEndDay}
+                              {planner.plannerStartDate} ~ {planner.plannerEndDate}
                             </p>
                           </div>
                           <div className="flex justify-end">
@@ -248,7 +250,11 @@ const MainPlan = () => {
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
           <div className="w-full max-w-2xl">
-            <CreatePlan onSuccess={handleCreateSuccess} onClose={() => setShowCreate(false)} />
+            <CreatePlan
+              userId={userId}
+              onSuccess={handleCreateSuccess}
+              onClose={() => setShowCreate(false)}
+            />
           </div>
         </div>
       )}
