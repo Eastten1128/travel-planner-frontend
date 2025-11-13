@@ -110,6 +110,72 @@ const normalizeTimeForDisplay = (value) => {
   return "";
 };
 
+const formatDateToYMD = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const sanitizeDateOnly = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return formatDateToYMD(value);
+  }
+
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const parsed = new Date(value);
+    return formatDateToYMD(parsed);
+  }
+
+  return null;
+};
+
+const sanitizeTodaySequence = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+
+  const intValue = Math.trunc(numeric);
+  return intValue >= 1 ? intValue : null;
+};
+
+const extractPlanDate = (plan, fallbackDate = null) =>
+  sanitizeDateOnly(
+    plan?.todayPlanDate ??
+      plan?.planDate ??
+      plan?.todayDate ??
+      plan?.travelDate ??
+      fallbackDate ??
+      null
+  );
+
+const extractPlanSequence = (plan) =>
+  sanitizeTodaySequence(
+    plan?.todayNo ??
+      plan?.sequence ??
+      plan?.order ??
+      plan?.orderNo ??
+      plan?.todayPlanOrder ??
+      null
+  );
+
 const normalizeNumeric = (value) => {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -122,7 +188,7 @@ const normalizeNumeric = (value) => {
   return numeric;
 };
 
-const normalizePlan = (plan, fallbackPlannerNo) => {
+const normalizePlan = (plan, fallbackPlannerNo, fallbackDate) => {
   if (!plan) {
     return null;
   }
@@ -145,6 +211,8 @@ const normalizePlan = (plan, fallbackPlannerNo) => {
     clientGeneratedId: existingId ? plan.clientGeneratedId : resolvedId,
     todayPlanNo: plan.todayPlanNo ?? plan.todayPlanId ?? null,
     plannerNo: plan.plannerNo ?? fallbackPlannerNo ?? null,
+    todayPlanDate: extractPlanDate(plan, fallbackDate),
+    todayNo: extractPlanSequence(plan),
     placeName: titleText || plan.placeName || plan.title || "",
     title: titleText || plan.title || plan.placeName || "",
     addr: addressText,
@@ -157,6 +225,17 @@ const normalizePlan = (plan, fallbackPlannerNo) => {
     memo: plan.memo ?? "",
   };
 };
+
+const resolvePlannerStartDate = (planner) =>
+  sanitizeDateOnly(
+    planner?.plannerStartday ??
+      planner?.plannerStartDay ??
+      planner?.plannerStartDate ??
+      planner?.startday ??
+      planner?.startDay ??
+      planner?.startDate ??
+      null
+  );
 
 const normalizePlannerPlans = (planner) => {
   const plans =
@@ -177,7 +256,8 @@ const normalizePlannerPlans = (planner) => {
           ...plan,
           plannerNo: plan?.plannerNo ?? planner?.plannerNo ?? planner?.id ?? null,
         },
-        planner?.plannerNo ?? planner?.id ?? null
+        planner?.plannerNo ?? planner?.id ?? null,
+        resolvePlannerStartDate(planner)
       )
     )
     .filter(Boolean);
@@ -211,6 +291,38 @@ const isSameIdentifier = (plan, identifier) => {
     return false;
   }
   return String(planId) === String(identifier);
+};
+
+const deriveNextSequenceForDate = (plans, date, excludeIdentifier = null) => {
+  if (!date) {
+    return null;
+  }
+
+  const sequences = [];
+  plans.forEach((plan) => {
+    if (
+      excludeIdentifier !== null &&
+      isSameIdentifier(plan, excludeIdentifier)
+    ) {
+      return;
+    }
+
+    const planDate = extractPlanDate(plan);
+    if (planDate !== date) {
+      return;
+    }
+
+    const sequence = extractPlanSequence(plan);
+    if (sequence !== null) {
+      sequences.push(sequence);
+    }
+  });
+
+  if (sequences.length === 0) {
+    return 1;
+  }
+
+  return Math.max(...sequences) + 1;
 };
 
 const toTimeWithSeconds = (value) => {
@@ -355,7 +467,8 @@ const MainA = () => {
         address: plan.address ?? plan.addr ?? "",
         plannerNo: plan.plannerNo ?? currentPlanner?.plannerNo ?? null,
       },
-      currentPlanner?.plannerNo ?? null
+      currentPlanner?.plannerNo ?? null,
+      resolvePlannerStartDate(currentPlanner)
     );
 
     if (!enrichedPlan) {
@@ -377,7 +490,11 @@ const MainA = () => {
     const identifier = getPlanIdentifier(plan);
     const resolvedPlan =
       todayPlans.find((item) => isSameIdentifier(item, identifier)) ??
-      normalizePlan(plan, currentPlanner?.plannerNo ?? null);
+      normalizePlan(
+        plan,
+        currentPlanner?.plannerNo ?? null,
+        resolvePlannerStartDate(currentPlanner)
+      );
     setSelectedPlan(resolvedPlan);
     setDetailOpen(true);
   };
@@ -427,6 +544,8 @@ const MainA = () => {
     endAt,
     budgetAmount,
     memo,
+    todayPlanDate,
+    todayNo,
   }) => {
     if (!selectedPlan) {
       return;
@@ -463,6 +582,26 @@ const MainA = () => {
     const identifier = getPlanIdentifier(selectedPlan);
     const resolvedMemo =
       typeof memo === "string" ? memo : selectedPlan.memo ?? "";
+    const plannerStartDate = resolvePlannerStartDate(currentPlanner);
+    const sanitizedDate =
+      sanitizeDateOnly(todayPlanDate) ??
+      extractPlanDate(selectedPlan) ??
+      sanitizeDateOnly(plannerStartDate);
+
+    if (!sanitizedDate) {
+      alert("일정 날짜를 선택하거나 입력해주세요.");
+      return;
+    }
+
+    const providedSequence = sanitizeTodaySequence(todayNo);
+    const existingSequence = extractPlanSequence(selectedPlan);
+    const fallbackSequence = deriveNextSequenceForDate(
+      todayPlans,
+      sanitizedDate,
+      identifier
+    );
+    const resolvedTodayNo =
+      providedSequence ?? existingSequence ?? fallbackSequence ?? null;
 
     const baseRequest = {
       plannerNo: numericPlannerNo,
@@ -477,29 +616,11 @@ const MainA = () => {
         normalizeCoordinate(selectedPlan.mapY ?? selectedPlan.mapy) ?? undefined,
       address: selectedPlan.addr ?? selectedPlan.address ?? "",
       imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
+      todayPlanDate: sanitizedDate,
     };
 
-    const todayPlanDate =
-      selectedPlan.todayPlanDate ??
-      selectedPlan.planDate ??
-      selectedPlan.todayDate ??
-      selectedPlan.travelDate ??
-      null;
-    if (todayPlanDate) {
-      baseRequest.todayPlanDate = todayPlanDate;
-    }
-
-    const todaySequence =
-      selectedPlan.todayNo ??
-      selectedPlan.sequence ??
-      selectedPlan.order ??
-      selectedPlan.orderNo ??
-      null;
-    if (todaySequence !== null && todaySequence !== undefined) {
-      const numericTodayNo = Number(todaySequence);
-      baseRequest.todayNo = Number.isNaN(numericTodayNo)
-        ? todaySequence
-        : numericTodayNo;
+    if (resolvedTodayNo !== null) {
+      baseRequest.todayNo = resolvedTodayNo;
     }
 
     const contentIdCandidate =
@@ -563,21 +684,12 @@ const MainA = () => {
           memo: resolvedMemo,
           todayPlanDate:
             responseData?.todayPlanDate ??
-            todayPlanDate ??
-            selectedPlan.todayPlanDate ??
-            selectedPlan.planDate ??
-            selectedPlan.todayDate ??
-            null,
+            sanitizedDate,
           todayNo:
             responseData?.todayNo ??
             responseData?.sequence ??
             responseData?.order ??
-            todaySequence ??
-            selectedPlan.todayNo ??
-            selectedPlan.sequence ??
-            selectedPlan.order ??
-            selectedPlan.orderNo ??
-            null,
+            resolvedTodayNo,
           contentId:
             responseData?.contentId ??
             baseRequest.contentId ??
@@ -595,7 +707,8 @@ const MainA = () => {
             selectedPlan.contenttypeid ??
             null,
         },
-        numericPlannerNo
+        numericPlannerNo,
+        sanitizedDate ?? plannerStartDate
       );
 
       setTodayPlans((prev) => {

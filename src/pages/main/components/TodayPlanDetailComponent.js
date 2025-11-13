@@ -50,6 +50,69 @@ const sanitizeTimeInput = (value) => {
   return "";
 };
 
+const toDateInputValue = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = `${value.getMonth() + 1}`.padStart(2, "0");
+    const day = `${value.getDate()}`.padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      const year = parsed.getFullYear();
+      const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+      const day = `${parsed.getDate()}`.padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+  }
+
+  return "";
+};
+
+const sanitizeDateInput = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  const year = parsed.getFullYear();
+  const month = `${parsed.getMonth() + 1}`.padStart(2, "0");
+  const day = `${parsed.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const sanitizeSequenceInput = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+
+  const intValue = Math.trunc(numeric);
+  return intValue >= 1 ? intValue : null;
+};
+
 export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
   const [placeName, setPlaceName] = useState(place.title || place.placeName || "");
   const [startAt, setStartAt] = useState(toTimeInputValue(place.startAt));
@@ -58,6 +121,18 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
     place.budgetAmount ?? ""
   );
   const [memo, setMemo] = useState(place.memo || "");
+  const [todayPlanDate, setTodayPlanDate] = useState(
+    toDateInputValue(
+      place.todayPlanDate ||
+        place.planDate ||
+        place.todayDate ||
+        place.travelDate ||
+        ""
+    )
+  );
+  const [todayNo, setTodayNo] = useState(
+    place.todayNo ?? place.sequence ?? place.order ?? place.orderNo ?? ""
+  );
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -70,6 +145,18 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
         : place.budgetAmount
     );
     setMemo(place.memo || "");
+    setTodayPlanDate(
+      toDateInputValue(
+        place.todayPlanDate ||
+          place.planDate ||
+          place.todayDate ||
+          place.travelDate ||
+          ""
+      )
+    );
+    setTodayNo(
+      place.todayNo ?? place.sequence ?? place.order ?? place.orderNo ?? ""
+    );
   }, [place]);
 
   const parseToDate = (value) => {
@@ -115,6 +202,14 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
       return;
     }
 
+    const sanitizedDate = sanitizeDateInput(todayPlanDate);
+    if (!sanitizedDate) {
+      alert("일정 날짜를 선택해주세요.");
+      return;
+    }
+
+    const sanitizedSequence = sanitizeSequenceInput(todayNo);
+
     try {
       setSaving(true);
       await onSave({
@@ -127,6 +222,8 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
             ? null
             : numericBudget,
         memo,
+        todayPlanDate: sanitizedDate,
+        todayNo: sanitizedSequence,
       });
     } finally {
       setSaving(false);
@@ -155,6 +252,15 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
 
       <div className="space-y-2 text-sm">
         <div className="flex items-center justify-between gap-2">
+          <label className="mr-2">일정 날짜</label>
+          <input
+            type="date"
+            value={todayPlanDate}
+            onChange={(e) => setTodayPlanDate(e.target.value)}
+            className="flex-1 rounded-md px-2 py-1"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2">
           <label className="mr-2">시작 시간</label>
           <input
             type="time"
@@ -170,6 +276,16 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
             value={endAt}
             onChange={(e) => setEndAt(e.target.value)}
             className="flex-1 rounded-md px-2 py-1"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <label className="mr-2">일차 순번</label>
+          <input
+            type="number"
+            min="1"
+            className="w-24 px-2 py-1 rounded-md"
+            value={todayNo}
+            onChange={(e) => setTodayNo(e.target.value)}
           />
         </div>
         <div>
