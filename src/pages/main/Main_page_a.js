@@ -451,7 +451,8 @@ const MainA = () => {
     }
 
     const numericBudget = normalizeNumeric(budgetAmount);
-    const resolvedBudget = numericBudget ?? 0;
+    const resolvedBudget =
+      numericBudget ?? normalizeNumeric(selectedPlan.budgetAmount);
     const numericPlannerNo = Number(resolvedPlannerNo);
 
     if (Number.isNaN(numericPlannerNo)) {
@@ -460,13 +461,16 @@ const MainA = () => {
     }
 
     const identifier = getPlanIdentifier(selectedPlan);
+    const resolvedMemo =
+      typeof memo === "string" ? memo : selectedPlan.memo ?? "";
+
     const baseRequest = {
       plannerNo: numericPlannerNo,
       placeName: placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
       startAt: sanitizedStartAt,
       endAt: sanitizedEndAt,
-      budgetAmount: resolvedBudget,
-      memo: memo ?? "",
+      ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
+      memo: resolvedMemo,
       mapX:
         normalizeCoordinate(selectedPlan.mapX ?? selectedPlan.mapx) ?? undefined,
       mapY:
@@ -474,6 +478,55 @@ const MainA = () => {
       address: selectedPlan.addr ?? selectedPlan.address ?? "",
       imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
     };
+
+    const todayPlanDate =
+      selectedPlan.todayPlanDate ??
+      selectedPlan.planDate ??
+      selectedPlan.todayDate ??
+      selectedPlan.travelDate ??
+      null;
+    if (todayPlanDate) {
+      baseRequest.todayPlanDate = todayPlanDate;
+    }
+
+    const todaySequence =
+      selectedPlan.todayNo ??
+      selectedPlan.sequence ??
+      selectedPlan.order ??
+      selectedPlan.orderNo ??
+      null;
+    if (todaySequence !== null && todaySequence !== undefined) {
+      const numericTodayNo = Number(todaySequence);
+      baseRequest.todayNo = Number.isNaN(numericTodayNo)
+        ? todaySequence
+        : numericTodayNo;
+    }
+
+    const contentIdCandidate =
+      selectedPlan.contentId ??
+      selectedPlan.contentid ??
+      selectedPlan.placeId ??
+      selectedPlan.placeNo ??
+      selectedPlan.id ??
+      null;
+    if (contentIdCandidate !== null && contentIdCandidate !== undefined) {
+      const numericContentId = Number(contentIdCandidate);
+      baseRequest.contentId = Number.isNaN(numericContentId)
+        ? contentIdCandidate
+        : numericContentId;
+    }
+
+    const contentTypeIdCandidate =
+      selectedPlan.contentTypeId ?? selectedPlan.contenttypeid ?? null;
+    if (
+      contentTypeIdCandidate !== null &&
+      contentTypeIdCandidate !== undefined
+    ) {
+      const numericContentTypeId = Number(contentTypeIdCandidate);
+      baseRequest.contentTypeId = Number.isNaN(numericContentTypeId)
+        ? contentTypeIdCandidate
+        : numericContentTypeId;
+    }
 
     try {
       let response;
@@ -505,8 +558,42 @@ const MainA = () => {
             "",
           startAt: sanitizedStartAt,
           endAt: sanitizedEndAt,
-          budgetAmount: resolvedBudget,
-          memo: memo ?? "",
+          budgetAmount:
+            resolvedBudget ?? normalizeNumeric(selectedPlan.budgetAmount) ?? null,
+          memo: resolvedMemo,
+          todayPlanDate:
+            responseData?.todayPlanDate ??
+            todayPlanDate ??
+            selectedPlan.todayPlanDate ??
+            selectedPlan.planDate ??
+            selectedPlan.todayDate ??
+            null,
+          todayNo:
+            responseData?.todayNo ??
+            responseData?.sequence ??
+            responseData?.order ??
+            todaySequence ??
+            selectedPlan.todayNo ??
+            selectedPlan.sequence ??
+            selectedPlan.order ??
+            selectedPlan.orderNo ??
+            null,
+          contentId:
+            responseData?.contentId ??
+            baseRequest.contentId ??
+            selectedPlan.contentId ??
+            selectedPlan.contentid ??
+            selectedPlan.placeId ??
+            selectedPlan.placeNo ??
+            selectedPlan.id ??
+            null,
+          contentTypeId:
+            responseData?.contentTypeId ??
+            responseData?.contenttypeid ??
+            baseRequest.contentTypeId ??
+            selectedPlan.contentTypeId ??
+            selectedPlan.contenttypeid ??
+            null,
         },
         numericPlannerNo
       );

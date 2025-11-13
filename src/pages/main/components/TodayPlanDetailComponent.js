@@ -118,11 +118,14 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
     try {
       setSaving(true);
       await onSave({
-        plannerNo: place.plannerNo ?? 1,
+        plannerNo: place.plannerNo ?? null,
         placeName: placeName.trim(),
         startAt: sanitizedStart,
         endAt: sanitizedEnd,
-        budgetAmount: Number.isNaN(numericBudget) ? 0 : numericBudget,
+        budgetAmount:
+          budgetAmount === "" || Number.isNaN(numericBudget)
+            ? null
+            : numericBudget,
         memo,
       });
     } finally {

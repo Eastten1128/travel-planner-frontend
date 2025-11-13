@@ -78,8 +78,13 @@ function SearchComponent({ onAddPlan}) {
       return;
     }
 
+    const contentId = tour.contentid ?? tour.contentId ?? null;
+    const contentTypeId = tour.contenttypeid ?? tour.contentTypeId ?? null;
+
     const todayPlan = {
-      id: tour.contentid,
+      id: contentId ?? tour.id ?? tour.placeId ?? tour.placeNo,
+      contentId,
+      contentTypeId,
       title: tour.title,
       address: tour.addr1,
       image: tour.firstimage,
