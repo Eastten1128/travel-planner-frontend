@@ -1,9 +1,59 @@
 import React, { useEffect, useState } from "react";
 
+const toTimeInputValue = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    if (value.includes("T")) {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) {
+        return date.toISOString().slice(11, 16);
+      }
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+      return value.slice(0, 5);
+    }
+
+    if (/^\d{2}:\d{2}$/.test(value)) {
+      return value;
+    }
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(11, 16);
+  }
+
+  return "";
+};
+
+const sanitizeTimeInput = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (/^\d{2}:\d{2}$/.test(value)) {
+    return value;
+  }
+
+  if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+    return value.slice(0, 5);
+  }
+
+  const date = new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toISOString().slice(11, 16);
+  }
+
+  return "";
+};
+
 export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
   const [placeName, setPlaceName] = useState(place.title || place.placeName || "");
-  const [startAt, setStartAt] = useState(place.startAt || "");
-  const [endAt, setEndAt] = useState(place.endAt || "");
+  const [startAt, setStartAt] = useState(toTimeInputValue(place.startAt));
+  const [endAt, setEndAt] = useState(toTimeInputValue(place.endAt));
   const [budgetAmount, setBudgetAmount] = useState(
     place.budgetAmount ?? ""
   );
@@ -12,9 +62,13 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
 
   useEffect(() => {
     setPlaceName(place.title || place.placeName || "");
-    setStartAt(place.startAt || "");
-    setEndAt(place.endAt || "");
-    setBudgetAmount(place.budgetAmount ?? "");
+    setStartAt(toTimeInputValue(place.startAt));
+    setEndAt(toTimeInputValue(place.endAt));
+    setBudgetAmount(
+      place.budgetAmount === null || place.budgetAmount === undefined
+        ? ""
+        : place.budgetAmount
+    );
     setMemo(place.memo || "");
   }, [place]);
 
@@ -44,8 +98,11 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
       return;
     }
 
-    const startDate = parseToDate(startAt);
-    const endDate = parseToDate(endAt);
+    const sanitizedStart = sanitizeTimeInput(startAt);
+    const sanitizedEnd = sanitizeTimeInput(endAt);
+
+    const startDate = parseToDate(sanitizedStart);
+    const endDate = parseToDate(sanitizedEnd);
 
     if (startDate && endDate && startDate >= endDate) {
       alert("종료 시간은 시작 시간 이후여야 합니다.");
@@ -61,11 +118,14 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
     try {
       setSaving(true);
       await onSave({
-        plannerNo: place.plannerNo ?? 1,
+        plannerNo: place.plannerNo ?? null,
         placeName: placeName.trim(),
-        startAt,
-        endAt,
-        budgetAmount: Number.isNaN(numericBudget) ? 0 : numericBudget,
+        startAt: sanitizedStart,
+        endAt: sanitizedEnd,
+        budgetAmount:
+          budgetAmount === "" || Number.isNaN(numericBudget)
+            ? null
+            : numericBudget,
         memo,
       });
     } finally {
@@ -82,12 +142,15 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
         {place.title || placeName || "선택된 일정"}
       </h3>
       {place.imageUrl && (
-        <img
-          src={place.imageUrl}
-          alt={placeName || place.title}
-          className="rounded-md mb-3 w-full max-w-[300px] h-auto"
-        />
-      )}
+  <img
+    src={place.imageUrl}
+    alt={placeName || place.title}
+    width={300}
+    height={200}
+    className="rounded-md mb-3 object-cover"
+  />
+)}
+
       {place.addr && <p className="text-sm mb-3">{place.addr}</p>}
 
       <div className="space-y-2 text-sm">
