@@ -81,6 +81,47 @@ const ensurePlanId = (plan) => {
   return candidate !== undefined && candidate !== null ? candidate : null;
 };
 
+const normalizeTimeForDisplay = (value) => {
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "string") {
+    if (value.includes("T")) {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) {
+        return date.toISOString().slice(11, 16);
+      }
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+      return value.slice(0, 5);
+    }
+
+    if (/^\d{2}:\d{2}$/.test(value)) {
+      return value;
+    }
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(11, 16);
+  }
+
+  return "";
+};
+
+const normalizeNumeric = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+  return numeric;
+};
+
 const normalizePlan = (plan, fallbackPlannerNo) => {
   if (!plan) {
     return null;
@@ -110,6 +151,10 @@ const normalizePlan = (plan, fallbackPlannerNo) => {
     address: addressText,
     imageUrl: imageUrl,
     image: imageUrl ?? plan.image ?? null,
+    startAt: normalizeTimeForDisplay(plan.startAt),
+    endAt: normalizeTimeForDisplay(plan.endAt),
+    budgetAmount: normalizeNumeric(plan.budgetAmount),
+    memo: plan.memo ?? "",
   };
 };
 
@@ -166,6 +211,45 @@ const isSameIdentifier = (plan, identifier) => {
     return false;
   }
   return String(planId) === String(identifier);
+};
+
+const toTimeWithSeconds = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    if (/^\d{2}:\d{2}$/.test(value)) {
+      return `${value}:00`;
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(11, 19);
+    }
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(11, 19);
+  }
+
+  return null;
+};
+
+const normalizeCoordinate = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+  return numeric;
 };
 
 const MainA = () => {
@@ -356,27 +440,50 @@ const MainA = () => {
       return;
     }
 
+    const sanitizedStartAt =
+      toTimeWithSeconds(startAt) ?? toTimeWithSeconds(selectedPlan.startAt);
+    const sanitizedEndAt =
+      toTimeWithSeconds(endAt) ?? toTimeWithSeconds(selectedPlan.endAt);
+
+    if (!sanitizedStartAt || !sanitizedEndAt) {
+      alert("시작 시간과 종료 시간을 올바르게 입력해주세요.");
+      return;
+    }
+
+    const numericBudget = normalizeNumeric(budgetAmount);
+    const resolvedBudget = numericBudget ?? 0;
+    const numericPlannerNo = Number(resolvedPlannerNo);
+
+    if (Number.isNaN(numericPlannerNo)) {
+      alert("선택된 플래너 정보를 확인할 수 없습니다. 다시 시도해주세요.");
+      return;
+    }
+
     const identifier = getPlanIdentifier(selectedPlan);
-    const requestBody = {
-      plannerNo: resolvedPlannerNo,
-      todayPlanNo: selectedPlan.todayPlanNo ?? null,
+    const baseRequest = {
+      plannerNo: numericPlannerNo,
       placeName: placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
-      startAt,
-      endAt,
-      budgetAmount,
-      memo,
-      mapX: selectedPlan.mapX ?? selectedPlan.mapx ?? null,
-      mapY: selectedPlan.mapY ?? selectedPlan.mapy ?? null,
+      startAt: sanitizedStartAt,
+      endAt: sanitizedEndAt,
+      budgetAmount: resolvedBudget,
+      memo: memo ?? "",
+      mapX:
+        normalizeCoordinate(selectedPlan.mapX ?? selectedPlan.mapx) ?? undefined,
+      mapY:
+        normalizeCoordinate(selectedPlan.mapY ?? selectedPlan.mapy) ?? undefined,
       address: selectedPlan.addr ?? selectedPlan.address ?? "",
-      imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? null,
+      imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
     };
 
     try {
       let response;
       if (selectedPlan.todayPlanNo) {
-        response = await updateTodayPlan(selectedPlan.todayPlanNo, requestBody);
+        response = await updateTodayPlan(selectedPlan.todayPlanNo, {
+          ...baseRequest,
+          todayPlanNo: selectedPlan.todayPlanNo,
+        });
       } else {
-        response = await createTodayPlan(requestBody);
+        response = await createTodayPlan(baseRequest);
       }
 
       const responseData = response ?? {};
@@ -384,19 +491,24 @@ const MainA = () => {
         {
           ...selectedPlan,
           ...responseData,
-          plannerNo: resolvedPlannerNo,
+          plannerNo: numericPlannerNo,
           todayPlanNo:
             responseData?.todayPlanNo ??
             responseData?.todayPlanId ??
             selectedPlan.todayPlanNo ??
             null,
-          placeName: placeName ?? selectedPlan.placeName,
-          startAt,
-          endAt,
-          budgetAmount,
-          memo,
+          placeName:
+            placeName ??
+            responseData?.placeName ??
+            selectedPlan.placeName ??
+            selectedPlan.title ??
+            "",
+          startAt: sanitizedStartAt,
+          endAt: sanitizedEndAt,
+          budgetAmount: resolvedBudget,
+          memo: memo ?? "",
         },
-        resolvedPlannerNo
+        numericPlannerNo
       );
 
       setTodayPlans((prev) => {
