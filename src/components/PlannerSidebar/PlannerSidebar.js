@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, {useEffect, useState} from "react";
 import {
   Box,
   Typography,
@@ -8,6 +9,8 @@ import {
   Stack,
   Divider,
 } from "@mui/material";
+import client from "../../api/client";
+
 
 const PlannerSidebar = ({
   plannerTitle,
@@ -16,8 +19,123 @@ const PlannerSidebar = ({
   onRemove,
   onSave,
 }) => {
+
+  const [userPlannerTitle, setUserPlannerTitle] = useState(plannerTitle ?? "");
+  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
+
+  useEffect(() => {
+    if (plannerTitle === undefined) {
+      return;
+    }
+
+    setUserPlannerTitle((prev) => {
+      const nextTitle = plannerTitle ?? "";
+      return prev === nextTitle ? prev : nextTitle;
+    });
+  }, [plannerTitle]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const resolveFirstPlannerTitle = (data) => {
+      if (!data) {
+        return "";
+      }
+
+      if (Array.isArray(data) && data.length > 0) {
+        return (
+          data[0]?.plannerTitle ||
+          data[0]?.title ||
+          ""
+        );
+      }
+
+      if (Array.isArray(data?.content) && data.content.length > 0) {
+        return (
+          data.content[0]?.plannerTitle ||
+          data.content[0]?.title ||
+          ""
+        );
+      }
+
+      if (Array.isArray(data?.data) && data.data.length > 0) {
+        return (
+          data.data[0]?.plannerTitle ||
+          data.data[0]?.title ||
+          ""
+        );
+      }
+
+      if (typeof data === "object") {
+        return data.plannerTitle || data.title || "";
+      }
+
+      return "";
+    };
+
+    const fetchPlannerTitle = async () => {
+      if (plannerTitle) {
+        return;
+      }
+
+      const token = localStorage.getItem("accessToken");
+      if (!token) {
+        return;
+      }
+
+      setIsFetchingTitle(true);
+
+      try {
+        const userResponse = await client.get("/user/additionalInfo/check");
+        const userData = userResponse?.data ?? {};
+        const resolvedUserId =
+          userData?.userId ??
+          userData?.id ??
+          userData?.userid ??
+          userData?.userNo ??
+          null;
+
+        const plannerResponse = await client.get("/api/planners", {
+          params:
+            resolvedUserId !== null && resolvedUserId !== undefined
+              ? { userId: resolvedUserId }
+              : undefined,
+        });
+
+        const fetchedTitle = resolveFirstPlannerTitle(plannerResponse?.data);
+
+        if (!isMounted || !fetchedTitle) {
+          return;
+        }
+
+        setUserPlannerTitle(fetchedTitle);
+        if (typeof onTitleChange === "function" && plannerTitle !== fetchedTitle) {
+          onTitleChange(fetchedTitle);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("사용자 플래너 제목을 불러오지 못했습니다:", error);
+        }
+      } finally {
+        if (isMounted) {
+          setIsFetchingTitle(false);
+        }
+      }
+    };
+
+    fetchPlannerTitle();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [plannerTitle, onTitleChange]);
+
   const handleChangeTitle = (event) => {
-    onTitleChange(event.target.value);
+    const { value } = event.target;
+    setUserPlannerTitle(value);
+    if (typeof onTitleChange === "function") {
+      onTitleChange(value);
+    }
   };
 
   return (
@@ -33,13 +151,9 @@ const PlannerSidebar = ({
       }}
     >
       <Stack direction="row" spacing={1} alignItems="center">
-        <TextField
-          label="플래너 제"
-          value={plannerTitle}
-          onChange={handleChangeTitle}
-          size="small"
-          fullWidth
-        />
+        <h2 className="text-2xl font-semibold text-gray-900">
+  {userPlannerTitle || "플래너 제목"}
+</h2>
         <Button
           variant="contained"
           onClick={onSave}
