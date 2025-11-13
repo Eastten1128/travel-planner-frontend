@@ -414,7 +414,14 @@ const MainA = () => {
       alert("일정이 저장되었습니다.");
     } catch (error) {
       console.error("오늘의 일정 저장 실패:", error);
-      alert("일정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.");
+      let message = "일정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        message = "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 이용해주세요.";
+      } else if (error?.code === "ERR_NETWORK") {
+        message =
+          "서버에 연결할 수 없습니다. 로그인 상태를 확인한 뒤 다시 시도해주세요.";
+      }
+      alert(message);
     }
   };
 
