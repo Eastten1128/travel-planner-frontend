@@ -10,7 +10,7 @@ const Footer = () => {
         target="_blank"
         rel="noopener"
       >
-        <Typography variant="caption">PINLIB STUDIO</Typography>
+        <Typography variant="caption">여행 플래너</Typography>
       </Link>
     </Box>
   );

@@ -40,36 +40,10 @@ const Navbar = () => {
     <AppBar position="sticky" sx={{ backgroundColor: "#000" }}>
       <Toolbar>
         <Button color="inherit" onClick={() => navigate("/main/plan")}>Home</Button>
-        <Button color="inherit">KADR25</Button>
-        
-        <Box position="relative" ml={2}>
-          <TextField
-            variant="outlined"
-            placeholder="Search Album..."
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ backgroundColor: "white", borderRadius: 1, width: "300px" }}
-          />
-          {suggestions.length > 0 && (
-            <Paper
-              sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10 }}
-              elevation={3}
-            >
-              <List>
-                {suggestions.map((item) => (
-                  <ListItem button key={item.id} onClick={() => handleSelect(item)}>
-                    {item.albumName} - {item.artistName}
-                  </ListItem>
-                ))}
-              </List>
-            </Paper>
-          )}
-        </Box>
-
-        <Button color="inherit" sx={{ marginLeft: "20px" }} onClick={() => navigate("/user/qualityReviewerAward")}>Quality Reviewer Award</Button>
+        <Button color="inherit">NAV1</Button>
+        <Button color="inherit" sx={{ marginLeft: "20px" }} onClick={() => navigate("/user/qualityReviewerAward")}>Nav2</Button>
         <Button color="inherit" onClick={() => navigate("/user/userInfo")}>User Info</Button>
-        <Button color="inherit" onClick={() => navigate("/album/regist")}>앨범등록</Button>
+        <Button color="inherit" onClick={() => navigate("/album/regist")}>Nav3</Button>
         <LogOutButton />
       </Toolbar>
     </AppBar>
