@@ -1,5 +1,4 @@
 import logo from './logo.svg';
-<<<<<<< HEAD
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import './App.css';
 
@@ -27,7 +26,6 @@ function App() {
         </Routes>
       </Router>
     </GoogleOAuthProvider>
-=======
 import './App.css';
 
 function App() {
@@ -48,7 +46,6 @@ function App() {
         </a>
       </header>
     </div>
->>>>>>> 5c4cd592041f30a6c9829ea79b4ad729f04f5652
   );
 }
 
