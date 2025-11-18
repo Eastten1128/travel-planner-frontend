@@ -25,7 +25,7 @@ import {
   createTodayPlan,
   updateTodayPlan,
   deleteTodayPlan,
-} from "../../api/todayPlan";
+} from "../../api/todayplan";
 
 const generateClientId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -421,208 +421,263 @@ const MainA = () => {
   };
 
   const handleSaveTodayPlan = async ({
-    plannerNo,
-    placeName,
-    startAt,
-    endAt,
-    budgetAmount,
-    memo,
-  }) => {
-    if (!selectedPlan) {
-      return;
-    }
+  plannerNo,
+  placeName,
+  startAt,
+  endAt,
+  budgetAmount,
+  memo,
+}) => {
+  if (!selectedPlan) {
+    return;
+  }
 
-    const resolvedPlannerNo =
-      plannerNo ?? currentPlanner?.plannerNo ?? selectedPlan.plannerNo;
+  const resolvedPlannerNo =
+    plannerNo ?? currentPlanner?.plannerNo ?? selectedPlan.plannerNo;
 
-    if (!resolvedPlannerNo) {
-      alert("먼저 플래너를 저장하거나 선택해주세요.");
-      return;
-    }
+  if (!resolvedPlannerNo) {
+    alert("먼저 플래너를 저장하거나 선택해주세요.");
+    return;
+  }
 
-    const sanitizedStartAt =
-      toTimeWithSeconds(startAt) ?? toTimeWithSeconds(selectedPlan.startAt);
-    const sanitizedEndAt =
-      toTimeWithSeconds(endAt) ?? toTimeWithSeconds(selectedPlan.endAt);
+  // 1) 시간 부분을 HH:mm:ss 로 정규화
+  const sanitizedStartTime =
+    toTimeWithSeconds(startAt) ?? toTimeWithSeconds(selectedPlan.startAt);
+  const sanitizedEndTime =
+    toTimeWithSeconds(endAt) ?? toTimeWithSeconds(selectedPlan.endAt);
 
-    if (!sanitizedStartAt || !sanitizedEndAt) {
-      alert("시작 시간과 종료 시간을 올바르게 입력해주세요.");
-      return;
-    }
+  if (!sanitizedStartTime || !sanitizedEndTime) {
+    alert("시작 시간과 종료 시간을 올바르게 입력해주세요.");
+    return;
+  }
 
-    const numericBudget = normalizeNumeric(budgetAmount);
-    const resolvedBudget =
-      numericBudget ?? normalizeNumeric(selectedPlan.budgetAmount);
-    const numericPlannerNo = Number(resolvedPlannerNo);
+  // 2) 날짜 부분(todayPlanDate 등)에서 yyyy-MM-dd 추출
+  const rawDateValue =
+    selectedPlan.todayPlanDate ??
+    selectedPlan.planDate ??
+    selectedPlan.todayDate ??
+    selectedPlan.travelDate ??
+    null;
 
-    if (Number.isNaN(numericPlannerNo)) {
-      alert("선택된 플래너 정보를 확인할 수 없습니다. 다시 시도해주세요.");
-      return;
-    }
+  const extractDatePart = (value) => {
+    if (!value) return null;
 
-    const identifier = getPlanIdentifier(selectedPlan);
-    const resolvedMemo =
-      typeof memo === "string" ? memo : selectedPlan.memo ?? "";
-
-    const baseRequest = {
-      plannerNo: numericPlannerNo,
-      placeName: placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
-      startAt: sanitizedStartAt,
-      endAt: sanitizedEndAt,
-      ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
-      memo: resolvedMemo,
-      mapX:
-        normalizeCoordinate(selectedPlan.mapX ?? selectedPlan.mapx) ?? undefined,
-      mapY:
-        normalizeCoordinate(selectedPlan.mapY ?? selectedPlan.mapy) ?? undefined,
-      address: selectedPlan.addr ?? selectedPlan.address ?? "",
-      imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
-    };
-
-    const todayPlanDate =
-      selectedPlan.todayPlanDate ??
-      selectedPlan.planDate ??
-      selectedPlan.todayDate ??
-      selectedPlan.travelDate ??
-      null;
-    if (todayPlanDate) {
-      baseRequest.todayPlanDate = todayPlanDate;
-    }
-
-    const todaySequence =
-      selectedPlan.todayNo ??
-      selectedPlan.sequence ??
-      selectedPlan.order ??
-      selectedPlan.orderNo ??
-      null;
-    if (todaySequence !== null && todaySequence !== undefined) {
-      const numericTodayNo = Number(todaySequence);
-      baseRequest.todayNo = Number.isNaN(numericTodayNo)
-        ? todaySequence
-        : numericTodayNo;
-    }
-
-    const contentIdCandidate =
-      selectedPlan.contentId ??
-      selectedPlan.contentid ??
-      selectedPlan.placeId ??
-      selectedPlan.placeNo ??
-      selectedPlan.id ??
-      null;
-    if (contentIdCandidate !== null && contentIdCandidate !== undefined) {
-      const numericContentId = Number(contentIdCandidate);
-      baseRequest.contentId = Number.isNaN(numericContentId)
-        ? contentIdCandidate
-        : numericContentId;
-    }
-
-    const contentTypeIdCandidate =
-      selectedPlan.contentTypeId ?? selectedPlan.contenttypeid ?? null;
-    if (
-      contentTypeIdCandidate !== null &&
-      contentTypeIdCandidate !== undefined
-    ) {
-      const numericContentTypeId = Number(contentTypeIdCandidate);
-      baseRequest.contentTypeId = Number.isNaN(numericContentTypeId)
-        ? contentTypeIdCandidate
-        : numericContentTypeId;
-    }
-
-    try {
-      let response;
-      if (selectedPlan.todayPlanNo) {
-        response = await updateTodayPlan(selectedPlan.todayPlanNo, {
-          ...baseRequest,
-          todayPlanNo: selectedPlan.todayPlanNo,
-        });
-      } else {
-        response = await createTodayPlan(baseRequest);
+    // 문자열인 경우
+    if (typeof value === "string") {
+      // "2025-11-19T00:00:00" 같이 T가 있으면 앞부분만
+      if (value.includes("T")) {
+        return value.split("T")[0];
       }
-
-      const responseData = response ?? {};
-      const mergedPlan = normalizePlan(
-        {
-          ...selectedPlan,
-          ...responseData,
-          plannerNo: numericPlannerNo,
-          todayPlanNo:
-            responseData?.todayPlanNo ??
-            responseData?.todayPlanId ??
-            selectedPlan.todayPlanNo ??
-            null,
-          placeName:
-            placeName ??
-            responseData?.placeName ??
-            selectedPlan.placeName ??
-            selectedPlan.title ??
-            "",
-          startAt: sanitizedStartAt,
-          endAt: sanitizedEndAt,
-          budgetAmount:
-            resolvedBudget ?? normalizeNumeric(selectedPlan.budgetAmount) ?? null,
-          memo: resolvedMemo,
-          todayPlanDate:
-            responseData?.todayPlanDate ??
-            todayPlanDate ??
-            selectedPlan.todayPlanDate ??
-            selectedPlan.planDate ??
-            selectedPlan.todayDate ??
-            null,
-          todayNo:
-            responseData?.todayNo ??
-            responseData?.sequence ??
-            responseData?.order ??
-            todaySequence ??
-            selectedPlan.todayNo ??
-            selectedPlan.sequence ??
-            selectedPlan.order ??
-            selectedPlan.orderNo ??
-            null,
-          contentId:
-            responseData?.contentId ??
-            baseRequest.contentId ??
-            selectedPlan.contentId ??
-            selectedPlan.contentid ??
-            selectedPlan.placeId ??
-            selectedPlan.placeNo ??
-            selectedPlan.id ??
-            null,
-          contentTypeId:
-            responseData?.contentTypeId ??
-            responseData?.contenttypeid ??
-            baseRequest.contentTypeId ??
-            selectedPlan.contentTypeId ??
-            selectedPlan.contenttypeid ??
-            null,
-        },
-        numericPlannerNo
-      );
-
-      setTodayPlans((prev) => {
-        const next = prev.map((plan) =>
-          isSameIdentifier(plan, identifier) ? mergedPlan : plan
-        );
-        if (!next.some((plan) => isSameIdentifier(plan, getPlanIdentifier(mergedPlan)))) {
-          next.push(mergedPlan);
-        }
-        return next;
-      });
-
-      setSelectedPlan(mergedPlan);
-      setDetailOpen(true);
-      alert("일정이 저장되었습니다.");
-    } catch (error) {
-      console.error("오늘의 일정 저장 실패:", error);
-      let message = "일정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        message = "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 이용해주세요.";
-      } else if (error?.code === "ERR_NETWORK") {
-        message =
-          "서버에 연결할 수 없습니다. 로그인 상태를 확인한 뒤 다시 시도해주세요.";
-      }
-      alert(message);
+      // "2025-11-19" 형태라고 가정
+      return value.slice(0, 10);
     }
+
+    // Date 객체인 경우
+    if (value instanceof Date) {
+      return value.toISOString().slice(0, 10); // yyyy-MM-dd
+    }
+
+    return null;
   };
+
+  let datePart = extractDatePart(rawDateValue);
+
+  // 만약 날짜가 전혀 없다면, 오늘 날짜로 fallback
+  if (!datePart) {
+    datePart = new Date().toISOString().slice(0, 10); // yyyy-MM-dd
+  }
+
+  // 3) LocalDateTime 형식으로 합치기: yyyy-MM-ddTHH:mm:ss
+  const startDateTime = `${datePart}T${sanitizedStartTime}`;
+  const endDateTime = `${datePart}T${sanitizedEndTime}`;
+
+  const numericBudget = normalizeNumeric(budgetAmount);
+  const resolvedBudget =
+    numericBudget ?? normalizeNumeric(selectedPlan.budgetAmount);
+  const numericPlannerNo = Number(resolvedPlannerNo);
+
+  if (Number.isNaN(numericPlannerNo)) {
+    alert("선택된 플래너 정보를 확인할 수 없습니다. 다시 시도해주세요.");
+    return;
+  }
+
+  const identifier = getPlanIdentifier(selectedPlan);
+  const resolvedMemo =
+    typeof memo === "string" ? memo : selectedPlan.memo ?? "";
+
+  const baseRequest = {
+  plannerNo: numericPlannerNo,
+  placeName:
+    placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
+  startAt: startDateTime,
+  endAt: endDateTime,
+  // ★ 오늘(또는 선택된 날짜) 기준 날짜를 LocalDate 필드로 같이 보냄
+  todayPlanDate: datePart, // "2025-11-18" 같은 값
+
+  ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
+  memo: resolvedMemo,
+  mapX:
+    normalizeCoordinate(selectedPlan.mapX ?? selectedPlan.mapx) ?? undefined,
+  mapY:
+    normalizeCoordinate(selectedPlan.mapY ?? selectedPlan.mapy) ?? undefined,
+  address: selectedPlan.addr ?? selectedPlan.address ?? "",
+  imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
+};
+
+
+  // 날짜/순번/콘텐츠 ID 등 기존 로직 그대로 유지
+  const todayPlanDate =
+    selectedPlan.todayPlanDate ??
+    selectedPlan.planDate ??
+    selectedPlan.todayDate ??
+    selectedPlan.travelDate ??
+    null;
+  if (todayPlanDate) {
+    baseRequest.todayPlanDate = todayPlanDate;
+  }
+
+  const todaySequence =
+    selectedPlan.todayNo ??
+    selectedPlan.sequence ??
+    selectedPlan.order ??
+    selectedPlan.orderNo ??
+    null;
+  if (todaySequence !== null && todaySequence !== undefined) {
+    const numericTodayNo = Number(todaySequence);
+    baseRequest.todayNo = Number.isNaN(numericTodayNo)
+      ? todaySequence
+      : numericTodayNo;
+  }
+
+  const contentIdCandidate =
+    selectedPlan.contentId ??
+    selectedPlan.contentid ??
+    selectedPlan.placeId ??
+    selectedPlan.placeNo ??
+    selectedPlan.id ??
+    null;
+  if (contentIdCandidate !== null && contentIdCandidate !== undefined) {
+    const numericContentId = Number(contentIdCandidate);
+    baseRequest.contentId = Number.isNaN(numericContentId)
+      ? contentIdCandidate
+      : numericContentId;
+  }
+
+  const contentTypeIdCandidate =
+    selectedPlan.contentTypeId ?? selectedPlan.contenttypeid ?? null;
+  if (
+    contentTypeIdCandidate !== null &&
+    contentTypeIdCandidate !== undefined
+  ) {
+    const numericContentTypeId = Number(contentTypeIdCandidate);
+    baseRequest.contentTypeId = Number.isNaN(numericContentTypeId)
+      ? contentTypeIdCandidate
+      : numericContentTypeId;
+  }
+
+  try {
+    let response;
+    if (selectedPlan.todayPlanNo) {
+      response = await updateTodayPlan(selectedPlan.todayPlanNo, {
+        ...baseRequest,
+        todayPlanNo: selectedPlan.todayPlanNo,
+      });
+    } else {
+      response = await createTodayPlan(baseRequest);
+    }
+
+    const responseData = response ?? {};
+    const mergedPlan = normalizePlan(
+      {
+        ...selectedPlan,
+        ...responseData,
+        plannerNo: numericPlannerNo,
+        todayPlanNo:
+          responseData?.todayPlanNo ??
+          responseData?.todayPlanId ??
+          selectedPlan.todayPlanNo ??
+          null,
+        placeName:
+          placeName ??
+          responseData?.placeName ??
+          selectedPlan.placeName ??
+          selectedPlan.title ??
+          "",
+        // 여기에는 LocalDateTime을 넣지만, normalizePlan에서 화면용 HH:mm로 다시 잘라줄 것
+        startAt: startDateTime,
+        endAt: endDateTime,
+        budgetAmount:
+          resolvedBudget ?? normalizeNumeric(selectedPlan.budgetAmount) ?? null,
+        memo: resolvedMemo,
+        todayPlanDate:
+          responseData?.todayPlanDate ??
+          todayPlanDate ??
+          selectedPlan.todayPlanDate ??
+          selectedPlan.planDate ??
+          selectedPlan.todayDate ??
+          null,
+        todayNo:
+          responseData?.todayNo ??
+          responseData?.sequence ??
+          responseData?.order ??
+          todaySequence ??
+          selectedPlan.todayNo ??
+          selectedPlan.sequence ??
+          selectedPlan.order ??
+          selectedPlan.orderNo ??
+          null,
+        contentId:
+          responseData?.contentId ??
+          baseRequest.contentId ??
+          selectedPlan.contentId ??
+          selectedPlan.contentid ??
+          selectedPlan.placeId ??
+          selectedPlan.placeNo ??
+          selectedPlan.id ??
+          null,
+        contentTypeId:
+          responseData?.contentTypeId ??
+          responseData?.contenttypeid ??
+          baseRequest.contentTypeId ??
+          selectedPlan.contentTypeId ??
+          selectedPlan.contenttypeid ??
+          null,
+      },
+      numericPlannerNo
+    );
+
+    setTodayPlans((prev) => {
+      const next = prev.map((plan) =>
+        isSameIdentifier(plan, identifier) ? mergedPlan : plan
+      );
+      if (
+        !next.some((plan) =>
+          isSameIdentifier(plan, getPlanIdentifier(mergedPlan))
+        )
+      ) {
+        next.push(mergedPlan);
+      }
+      return next;
+    });
+
+    setSelectedPlan(mergedPlan);
+    setDetailOpen(true);
+    alert("일정이 저장되었습니다.");
+  } catch (error) {
+    console.error("오늘의 일정 저장 실패:", error);
+    let message = "일정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
+      message = "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 이용해주세요.";
+    } else if (error?.code === "ERR_NETWORK") {
+      message =
+        "서버에 연결할 수 없습니다. 로그인 상태를 확인한 뒤 다시 시도해주세요.";
+      console.log("saved accessToken:", localStorage.getItem("accessToken"));
+
+    }
+    alert(message);
+  }
+};
+
 
   const handleCancelDetail = () => {
     setDetailOpen(false);

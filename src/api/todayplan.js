@@ -1,5 +1,6 @@
 import client from "./client";
 
+//씨발
 export const createTodayPlan = async (payload) => {
   const response = await client.post("/api/today-plans", payload);
   return response.data;
