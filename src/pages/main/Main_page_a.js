@@ -421,13 +421,13 @@ const MainA = () => {
   };
 
   const handleSaveTodayPlan = async ({
-  plannerNo,
-  placeName,
-  startAt,
-  endAt,
-  budgetAmount,
-  memo,
-}) => {
+    plannerNo,
+    placeName,
+    startAt,
+    endAt,
+    budgetAmount,
+    memo,
+  }) => {
   if (!selectedPlan) {
     return;
   }
@@ -505,74 +505,69 @@ const MainA = () => {
   const resolvedMemo =
     typeof memo === "string" ? memo : selectedPlan.memo ?? "";
 
-  const baseRequest = {
-  plannerNo: numericPlannerNo,
-  placeName:
-    placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
-  startAt: startDateTime,
-  endAt: endDateTime,
-  // ★ 오늘(또는 선택된 날짜) 기준 날짜를 LocalDate 필드로 같이 보냄
-  todayPlanDate: datePart, // "2025-11-18" 같은 값
-
-  ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
-  memo: resolvedMemo,
-  mapX:
-    normalizeCoordinate(selectedPlan.mapX ?? selectedPlan.mapx) ?? undefined,
-  mapY:
-    normalizeCoordinate(selectedPlan.mapY ?? selectedPlan.mapy) ?? undefined,
-  address: selectedPlan.addr ?? selectedPlan.address ?? "",
-  imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
-};
-
-
-  // 날짜/순번/콘텐츠 ID 등 기존 로직 그대로 유지
-  const todayPlanDate =
-    selectedPlan.todayPlanDate ??
-    selectedPlan.planDate ??
-    selectedPlan.todayDate ??
-    selectedPlan.travelDate ??
-    null;
-  if (todayPlanDate) {
-    baseRequest.todayPlanDate = todayPlanDate;
-  }
-
   const todaySequence =
     selectedPlan.todayNo ??
     selectedPlan.sequence ??
     selectedPlan.order ??
     selectedPlan.orderNo ??
     null;
-  if (todaySequence !== null && todaySequence !== undefined) {
-    const numericTodayNo = Number(todaySequence);
-    baseRequest.todayNo = Number.isNaN(numericTodayNo)
-      ? todaySequence
-      : numericTodayNo;
-  }
 
-  const contentIdCandidate =
+  const resolvedTodayNo = (() => {
+    if (todaySequence !== null && todaySequence !== undefined) {
+      const numericTodayNo = Number(todaySequence);
+      return Number.isNaN(numericTodayNo) ? 1 : numericTodayNo;
+    }
+    return 1;
+  })();
+
+  const placeTypeCandidate =
+    selectedPlan.placeTypeId ??
+    selectedPlan.placeTypeNo ??
+    selectedPlan.placeType?.id ??
+    selectedPlan.contentTypeId ??
+    selectedPlan.contenttypeid ??
+    null;
+  const resolvedPlaceTypeId = (() => {
+    if (placeTypeCandidate === null || placeTypeCandidate === undefined) {
+      return null;
+    }
+    const numericType = Number(placeTypeCandidate);
+    return Number.isNaN(numericType) ? null : numericType;
+  })();
+
+  const placeRefCandidate =
+    selectedPlan.placeRef ??
     selectedPlan.contentId ??
     selectedPlan.contentid ??
     selectedPlan.placeId ??
     selectedPlan.placeNo ??
     selectedPlan.id ??
     null;
-  if (contentIdCandidate !== null && contentIdCandidate !== undefined) {
-    const numericContentId = Number(contentIdCandidate);
-    baseRequest.contentId = Number.isNaN(numericContentId)
-      ? contentIdCandidate
-      : numericContentId;
+
+  const todayPlanDate =
+    selectedPlan.todayPlanDate ??
+    selectedPlan.planDate ??
+    selectedPlan.todayDate ??
+    selectedPlan.travelDate ??
+    null;
+
+  const baseRequest = {
+    plannerNo: numericPlannerNo,
+    todayNo: resolvedTodayNo,
+    placeName:
+      placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
+    startAt: startDateTime,
+    endAt: endDateTime,
+    ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
+    memo: resolvedMemo,
+  };
+
+  if (resolvedPlaceTypeId !== null) {
+    baseRequest.placeTypeId = resolvedPlaceTypeId;
   }
 
-  const contentTypeIdCandidate =
-    selectedPlan.contentTypeId ?? selectedPlan.contenttypeid ?? null;
-  if (
-    contentTypeIdCandidate !== null &&
-    contentTypeIdCandidate !== undefined
-  ) {
-    const numericContentTypeId = Number(contentTypeIdCandidate);
-    baseRequest.contentTypeId = Number.isNaN(numericContentTypeId)
-      ? contentTypeIdCandidate
-      : numericContentTypeId;
+  if (placeRefCandidate !== null && placeRefCandidate !== undefined) {
+    baseRequest.placeRef = String(placeRefCandidate);
   }
 
   try {
