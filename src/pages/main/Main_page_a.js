@@ -25,7 +25,7 @@ import {
   createTodayPlan,
   updateTodayPlan,
   deleteTodayPlan,
-} from "../../api/todayPlan";
+} from "../../api/todayplan";
 
 const generateClientId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {

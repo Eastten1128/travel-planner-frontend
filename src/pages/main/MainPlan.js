@@ -209,8 +209,9 @@ const MainPlan = () => {
                   type="button"
                   className="mt-6 rounded-full bg-white/90 px-6 py-2 text-sm font-semibold text-indigo-700 shadow"
                   title="준비 중인 기능입니다."
+                  onClick={() => navigate("/chat")}
                 >
-                  준비 중
+                  AI TEST
                 </button>
               </section>
 

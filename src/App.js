@@ -7,6 +7,7 @@ import MainPlan from "./pages/main/MainPlan";
 import MainB from "./pages/main/Main_page_b";
 import AdditionalInfo from "./pages/exception/AdditionalInfo";
 import LoginError from "./pages/exception/LoginError";
+import TravelChatPage from "./pages/TravelChatPage";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
 function App() {
@@ -23,6 +24,8 @@ function App() {
           <Route path="/main/plan/detail/:plannerNo" element={<MainA />} />
           <Route path="/additional-info" element={<AdditionalInfo />} />
           <Route path="/loginError" element={<LoginError />} />
+
+          <Route path="/chat" element={<TravelChatPage />} />
         </Routes>
       </Router>
     </GoogleOAuthProvider>
