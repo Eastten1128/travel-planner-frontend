@@ -9,17 +9,65 @@ import {
   Stack,
   Divider,
 } from "@mui/material";
+import { getTodayPlansByPlanner } from "../../api/todayplan";
+
 
 const PlannerSidebar = ({
   plannerTitle = "",
   onTitleChange,
   todayPlans = [],
+  plannerNo,
   onSelectPlan,
   selectedPlanId,
   onRemove,
   onSave,
 }) => {
   const [titleInput, setTitleInput] = useState(plannerTitle ?? "");
+  const [savedPlans, setSavedPlans] = useState([]);
+
+    useEffect(() => {
+    let active = true;
+
+    const fetchSavedPlans = async () => {
+      if (plannerNo === undefined || plannerNo === null) {
+        setSavedPlans([]);
+        return;
+      }
+
+      try {
+        const data = await getTodayPlansByPlanner(plannerNo);
+        if (!active) return;
+
+        const planList = (() => {
+          if (Array.isArray(data)) return data;
+          if (Array.isArray(data?.content)) return data.content;
+          if (Array.isArray(data?.data)) return data.data;
+          if (Array.isArray(data?.items)) return data.items;
+          if (Array.isArray(data?.todayPlans)) return data.todayPlans;
+          return [];
+        })();
+
+        setSavedPlans(
+          planList.map((plan) => ({
+            ...plan,
+            plannerNo: plan?.plannerNo ?? plannerNo,
+            __source: "saved",
+          }))
+        );
+      } catch (error) {
+        console.error("오늘의 일정 불러오기 실패:", error);
+        if (active) {
+          setSavedPlans([]);
+        }
+      }
+    };
+
+    fetchSavedPlans();
+
+    return () => {
+      active = false;
+    };
+  }, [plannerNo]);
 
   useEffect(() => {
     setTitleInput(plannerTitle ?? "");
@@ -44,9 +92,70 @@ const PlannerSidebar = ({
     plan?.clientGeneratedId ??
     null;
 
+      const resolvePlannerNo = (plan) =>
+    plan?.plannerNo ?? plan?.plannerId ?? plan?.plannerid ?? null;
+
+  const filteredDraftPlans = useMemo(() => {
+    if (plannerNo === undefined || plannerNo === null) {
+      return todayPlans;
+    }
+
+    return todayPlans.filter((plan) => {
+      const planPlannerNo = resolvePlannerNo(plan);
+      if (planPlannerNo === undefined || planPlannerNo === null) {
+        return false;
+      }
+
+      return String(planPlannerNo) === String(plannerNo);
+    });
+  }, [plannerNo, todayPlans]);
+
+  const filteredSavedPlans = useMemo(() => {
+    if (plannerNo === undefined || plannerNo === null) {
+      return savedPlans;
+    }
+
+    return savedPlans.filter((plan) => {
+      const planPlannerNo = resolvePlannerNo(plan);
+      if (planPlannerNo === undefined || planPlannerNo === null) {
+        return false;
+      }
+
+      return String(planPlannerNo) === String(plannerNo);
+    });
+  }, [plannerNo, savedPlans]);
+
+  const combinedPlans = useMemo(() => {
+    const decoratedDrafts = filteredDraftPlans.map((plan) => ({
+      ...plan,
+      __source: plan.__source ?? "draft",
+    }));
+
+    const decoratedSaved = filteredSavedPlans.map((plan) => ({
+      ...plan,
+      __source: "saved",
+    }));
+
+    const seen = new Set();
+
+    return [...decoratedSaved, ...decoratedDrafts].filter((plan) => {
+      const id = resolvePlanId(plan);
+      if (id === undefined || id === null) {
+        return true;
+      }
+
+      if (seen.has(String(id))) {
+        return false;
+      }
+
+      seen.add(String(id));
+      return true;
+    });
+  }, [filteredDraftPlans, filteredSavedPlans]);
+
   const normalizedPlans = useMemo(
     () =>
-      todayPlans.map((plan) => {
+      combinedPlans.map((plan) => {
         const planId = resolvePlanId(plan);
         const titleText = plan?.placeName || plan?.title || "이름 없는 일정";
         const addressText = plan?.addr || plan?.address || "";
@@ -57,10 +166,11 @@ const PlannerSidebar = ({
             title: titleText,
             address: addressText,
             image: plan?.imageUrl || plan?.image || plan?.thumbnail,
+            sourceLabel: plan.__source === "saved" ? "저장됨" : "임시",
           },
         };
       }),
-    [todayPlans]
+    [combinedPlans]
   );
 
   const handleRemovePlan = (plan) => {
@@ -178,6 +288,9 @@ const PlannerSidebar = ({
                       >
                         {plan.__display.title}
                       </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {plan.__display.sourceLabel}
+                      </Typography>
                       {plan.__display.address && (
                         <Typography
                           variant="body2"
@@ -193,17 +306,23 @@ const PlannerSidebar = ({
                       )}
                     </Box>
                   </Stack>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleRemovePlan(plan);
-                    }}
-                  >
-                    삭제
-                  </Button>
+                  {plan.__source === "draft" ? (
+                    <Button
+                      variant="contained"
+                      color="error"
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleRemovePlan(plan);
+                      }}
+                    >
+                      삭제
+                    </Button>
+                  ) : (
+                    <Typography variant="caption" color="text.secondary">
+                      저장된 일정
+                    </Typography>
+                  )}  
                 </Paper>
               );
             })}

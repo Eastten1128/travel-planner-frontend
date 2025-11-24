@@ -759,6 +759,7 @@ const loadPlannerData = useCallback(
             plannerTitle={plannerTitle}
             onTitleChange={setPlannerTitle}
             todayPlans={todayPlans}
+            plannerNo={currentPlanner?.plannerNo}
             onSelectPlan={handleSelectSidebarItem}
             selectedPlanId={selectedPlanId}
             onRemove={handleRemovePlan}

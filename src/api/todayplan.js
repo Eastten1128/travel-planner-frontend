@@ -14,3 +14,10 @@ export const updateTodayPlan = async (todayPlanNo, payload) => {
 export const deleteTodayPlan = async (todayPlanNo) => {
   await client.delete(`/api/today-plans/${todayPlanNo}`);
 };
+
+export const getTodayPlansByPlanner = async (plannerNo) => {
+  const response = await client.get("/api/today-plans", {
+    params: { plannerNo },
+  });
+  return response.data;
+};
