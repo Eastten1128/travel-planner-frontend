@@ -9,7 +9,7 @@ import {
   Stack,
   Divider,
 } from "@mui/material";
-import { getTodayPlansByPlanner } from "../../api/todayplan";
+import { getTodayPlansByPlanner, deleteTodayPlan} from "../../api/todayplan";
 
 
 const PlannerSidebar = ({
@@ -25,7 +25,7 @@ const PlannerSidebar = ({
   const [titleInput, setTitleInput] = useState(plannerTitle ?? "");
   const [savedPlans, setSavedPlans] = useState([]);
 
-    useEffect(() => {
+  useEffect(() => {
     let active = true;
 
     const fetchSavedPlans = async () => {
@@ -92,7 +92,7 @@ const PlannerSidebar = ({
     plan?.clientGeneratedId ??
     null;
 
-      const resolvePlannerNo = (plan) =>
+    const resolvePlannerNo = (plan) =>
     plan?.plannerNo ?? plan?.plannerId ?? plan?.plannerid ?? null;
 
   const filteredDraftPlans = useMemo(() => {
@@ -177,6 +177,56 @@ const PlannerSidebar = ({
     const planId = resolvePlanId(plan);
     if (typeof onRemove === "function") {
       onRemove(planId, plan);
+    }
+  };
+
+  // 삭제 버튼 클릭 시 TodayPlan을 제거 (플래너 번호가 일치할 때만 수행)
+  const handleDeletePlan = async (event, plan) => {
+    event.stopPropagation();
+
+    const planId = resolvePlanId(plan);
+    const planPlannerNo = resolvePlannerNo(plan);
+
+    if (planId === undefined || planId === null) {
+      console.warn("삭제할 일정의 ID를 찾을 수 없습니다.", plan);
+      return;
+    }
+
+    if (plannerNo === undefined || plannerNo === null) {
+      console.warn("선택된 플래너가 없어 삭제를 건너뜁니다.");
+      return;
+    }
+
+    if (planPlannerNo === undefined || planPlannerNo === null) {
+      console.warn("일정의 플래너 번호가 없어 삭제를 건너뜁니다.", plan);
+      return;
+    }
+
+    if (String(planPlannerNo) !== String(plannerNo)) {
+      console.warn("현재 플래너와 일치하지 않는 일정입니다.", plan);
+      return;
+    }
+
+    if (plan.__source === "saved") {
+      try {
+        await deleteTodayPlan(planId);
+        setSavedPlans((prev) =>
+          prev.filter((savedPlan) => {
+            const savedPlanId = resolvePlanId(savedPlan);
+            const savedPlannerNo = resolvePlannerNo(savedPlan);
+
+            if (String(savedPlannerNo) !== String(plannerNo)) {
+              return true;
+            }
+
+            return String(savedPlanId) !== String(planId);
+          })
+        );
+      } catch (error) {
+        console.error("오늘의 일정 삭제 실패:", error);
+      }
+    } else {
+      handleRemovePlan(plan);
     }
   };
 
@@ -306,23 +356,14 @@ const PlannerSidebar = ({
                       )}
                     </Box>
                   </Stack>
-                  {plan.__source === "draft" ? (
-                    <Button
-                      variant="contained"
-                      color="error"
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleRemovePlan(plan);
-                      }}
-                    >
-                      삭제
-                    </Button>
-                  ) : (
-                    <Typography variant="caption" color="text.secondary">
-                      저장된 일정
-                    </Typography>
-                  )}  
+                <Button
+                    variant="contained"
+                    color="error"
+                    size="small"
+                    onClick={(event) => handleDeletePlan(event, plan)}
+                  >
+                    삭제
+                  </Button>
                 </Paper>
               );
             })}

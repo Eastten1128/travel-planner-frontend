@@ -11,6 +11,7 @@ const Footer = () => {
         rel="noopener"
       >
         <Typography variant="caption">PINLIB STUDIO</Typography>
+
       </Link>
     </Box>
   );

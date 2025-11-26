@@ -25,6 +25,7 @@ import {
   createTodayPlan,
   updateTodayPlan,
   deleteTodayPlan,
+  getTodayPlansByPlanner
 } from "../../api/todayplan";
 
 const generateClientId = () => {
@@ -264,10 +265,62 @@ const MainA = () => {
   const [currentUserId, setCurrentUserId] = useState(null);
   const {plannerNo} = useParams();
 
-const loadPlannerData = useCallback(
-  async (userId, targetPlannerNo) => {
-    try {
-      const plannerResponse = await getMyPlanners(
+
+    const fetchNextTodayNo = useCallback(
+    async (plannerNoForQuery) => {
+      if (plannerNoForQuery === undefined || plannerNoForQuery === null) {
+        return 1;
+      }
+
+      try {
+        const response = await getTodayPlansByPlanner(
+          plannerNoForQuery,
+          currentUserId ?? undefined
+        );
+
+        const planList = (() => {
+          if (Array.isArray(response)) return response;
+          if (Array.isArray(response?.content)) return response.content;
+          if (Array.isArray(response?.data)) return response.data;
+          if (Array.isArray(response?.items)) return response.items;
+          if (Array.isArray(response?.todayPlans)) return response.todayPlans;
+          return [];
+        })();
+
+        if (!planList.length) {
+          return 1;
+        }
+
+        const maxTodayNo = planList.reduce((maxValue, plan) => {
+          const rawTodayNo =
+            plan?.todayNo ??
+            plan?.sequence ??
+            plan?.order ??
+            plan?.orderNo ??
+            null;
+          const numericTodayNo = Number(rawTodayNo);
+          if (Number.isNaN(numericTodayNo)) {
+            return maxValue;
+          }
+
+          return Math.max(maxValue, numericTodayNo);
+        }, 0);
+
+        return maxTodayNo > 0 ? maxTodayNo + 1 : 1;
+      } catch (error) {
+        console.error("다음 today_no 계산 실패:", error);
+        return 1;
+      }
+    },
+    [currentUserId]
+  );
+
+
+
+  const loadPlannerData = useCallback(
+    async (userId, targetPlannerNo) => {
+      try {
+        const plannerResponse = await getMyPlanners(
         userId !== undefined && userId !== null ? { userId } : undefined
       );
       const planners = extractPlannerList(plannerResponse);
@@ -535,15 +588,21 @@ const loadPlannerData = useCallback(
     null;
 
 
-    //********************************************************return값을 +1씩 증가시켜야해요.
-    //db에서 userId, PlannerNo를 특정시킨 Planner의 today_no의 최대값을 갖고와 +1 
+    //수정********************************************************return값을 +1씩 증가시켜야해요.
   const resolvedTodayNo = (() => {
     if (todaySequence !== null && todaySequence !== undefined) {
       const numericTodayNo = Number(todaySequence);
-      return Number.isNaN(numericTodayNo) ? 3 : numericTodayNo;
+      console.log(todaySequence);
+      if(!Number.isNaN(numericTodayNo) && numericTodayNo> 0){
+        return numericTodayNo;
+      }
+
     }
-    return 2;
+    else console.log("no numericTodayNo");
+    return fetchNextTodayNo(numericPlannerNo);
+
   })();
+
 
   const placeTypeCandidate =
     selectedPlan.placeTypeId ??
