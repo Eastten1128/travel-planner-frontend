@@ -27,6 +27,8 @@ import {
   deleteTodayPlan,
   getTodayPlansByPlanner
 } from "../../api/todayplan";
+import GoogleMap from "../../components/Map/GoogleMap";
+
 
 const generateClientId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -831,11 +833,22 @@ const MainA = () => {
               gap: 3,
               alignItems: "flex-start",
               minHeight: 420,
-            }}
+            }}from
           >
-            <Box sx={{ flex: 1 }}>
+             <Box sx={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
               <SearchComponent onAddPlan={handleAddPlan} />
-            </Box>
+              <Paper sx={{ p: 2 }} elevation={2}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  선택한 여행지 지도
+                </Typography>
+                <GoogleMap
+                  query={
+                    selectedPlan?.placeName || selectedPlan?.title || "Seoul"
+                  }
+                  height={280}
+                />
+              </Paper>
+              </Box>
             {detailOpen && selectedPlan ? (
               <TodayPlanDetailComponent
                 place={selectedPlan}
