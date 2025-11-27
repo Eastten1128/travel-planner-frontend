@@ -17,6 +17,8 @@ const GoogleMap = ({
     query
   )}`;
 
+  const resolvedHeight = typeof height === "number" ? `${height}px` : height;
+
   return (
     <iframe
       width={width}
@@ -25,8 +27,9 @@ const GoogleMap = ({
       style={{
         width: "100%",
         maxWidth: "100%",
-        height: typeof height === "number" ? `${height}px` : height,
-        minHeight: typeof height === "number" ? `${height}px` : height,
+        height: resolvedHeight || "100%",
+        minHeight: resolvedHeight || "100%",
+        maxHeight: "100%",
         border: 0,
         borderRadius: 16,
         boxShadow: "0 18px 42px rgba(0, 0, 0, 0.12)",

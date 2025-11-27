@@ -839,24 +839,22 @@ const MainA = () => {
           <Box
             sx={{
               flex: 1.2,
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                lg: "minmax(520px, 1.7fr) 360px",
-              },
-              columnGap: { xs: 3, lg: 4 },
-              rowGap: 3,
-              alignItems: "start",
+              display: "flex",
+              flexDirection: { xs: "column", lg: "row" },
+              gap: { xs: 3, lg: 4 },
+              alignItems: "stretch",
               minHeight: 520,
+              width: "100%",
             }}
           >
-             <Box
+            <Box
               sx={{
                 display: "flex",
                 flexDirection: "column",
                 gap: 3,
                 alignItems: "stretch",
-                width: "100%",
+                width: { xs: "100%", lg: 380 },
+                flexShrink: 0,
               }}
             >
               <Box sx={{ maxWidth: 380, width: "100%" }}>
