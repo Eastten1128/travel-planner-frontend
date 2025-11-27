@@ -9,17 +9,65 @@ import {
   Stack,
   Divider,
 } from "@mui/material";
+import { getTodayPlansByPlanner, deleteTodayPlan} from "../../api/todayplan";
+
 
 const PlannerSidebar = ({
   plannerTitle = "",
   onTitleChange,
   todayPlans = [],
+  plannerNo,
   onSelectPlan,
   selectedPlanId,
   onRemove,
   onSave,
 }) => {
   const [titleInput, setTitleInput] = useState(plannerTitle ?? "");
+  const [savedPlans, setSavedPlans] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+
+    const fetchSavedPlans = async () => {
+      if (plannerNo === undefined || plannerNo === null) {
+        setSavedPlans([]);
+        return;
+      }
+
+      try {
+        const data = await getTodayPlansByPlanner(plannerNo);
+        if (!active) return;
+
+        const planList = (() => {
+          if (Array.isArray(data)) return data;
+          if (Array.isArray(data?.content)) return data.content;
+          if (Array.isArray(data?.data)) return data.data;
+          if (Array.isArray(data?.items)) return data.items;
+          if (Array.isArray(data?.todayPlans)) return data.todayPlans;
+          return [];
+        })();
+
+        setSavedPlans(
+          planList.map((plan) => ({
+            ...plan,
+            plannerNo: plan?.plannerNo ?? plannerNo,
+            __source: "saved",
+          }))
+        );
+      } catch (error) {
+        console.error("오늘의 일정 불러오기 실패:", error);
+        if (active) {
+          setSavedPlans([]);
+        }
+      }
+    };
+
+    fetchSavedPlans();
+
+    return () => {
+      active = false;
+    };
+  }, [plannerNo]);
 
   useEffect(() => {
     setTitleInput(plannerTitle ?? "");
@@ -44,9 +92,70 @@ const PlannerSidebar = ({
     plan?.clientGeneratedId ??
     null;
 
+    const resolvePlannerNo = (plan) =>
+    plan?.plannerNo ?? plan?.plannerId ?? plan?.plannerid ?? null;
+
+  const filteredDraftPlans = useMemo(() => {
+    if (plannerNo === undefined || plannerNo === null) {
+      return todayPlans;
+    }
+
+    return todayPlans.filter((plan) => {
+      const planPlannerNo = resolvePlannerNo(plan);
+      if (planPlannerNo === undefined || planPlannerNo === null) {
+        return false;
+      }
+
+      return String(planPlannerNo) === String(plannerNo);
+    });
+  }, [plannerNo, todayPlans]);
+
+  const filteredSavedPlans = useMemo(() => {
+    if (plannerNo === undefined || plannerNo === null) {
+      return savedPlans;
+    }
+
+    return savedPlans.filter((plan) => {
+      const planPlannerNo = resolvePlannerNo(plan);
+      if (planPlannerNo === undefined || planPlannerNo === null) {
+        return false;
+      }
+
+      return String(planPlannerNo) === String(plannerNo);
+    });
+  }, [plannerNo, savedPlans]);
+
+  const combinedPlans = useMemo(() => {
+    const decoratedDrafts = filteredDraftPlans.map((plan) => ({
+      ...plan,
+      __source: plan.__source ?? "draft",
+    }));
+
+    const decoratedSaved = filteredSavedPlans.map((plan) => ({
+      ...plan,
+      __source: "saved",
+    }));
+
+    const seen = new Set();
+
+    return [...decoratedSaved, ...decoratedDrafts].filter((plan) => {
+      const id = resolvePlanId(plan);
+      if (id === undefined || id === null) {
+        return true;
+      }
+
+      if (seen.has(String(id))) {
+        return false;
+      }
+
+      seen.add(String(id));
+      return true;
+    });
+  }, [filteredDraftPlans, filteredSavedPlans]);
+
   const normalizedPlans = useMemo(
     () =>
-      todayPlans.map((plan) => {
+      combinedPlans.map((plan) => {
         const planId = resolvePlanId(plan);
         const titleText = plan?.placeName || plan?.title || "이름 없는 일정";
         const addressText = plan?.addr || plan?.address || "";
@@ -57,16 +166,67 @@ const PlannerSidebar = ({
             title: titleText,
             address: addressText,
             image: plan?.imageUrl || plan?.image || plan?.thumbnail,
+            sourceLabel: plan.__source === "saved" ? "저장됨" : "임시",
           },
         };
       }),
-    [todayPlans]
+    [combinedPlans]
   );
 
   const handleRemovePlan = (plan) => {
     const planId = resolvePlanId(plan);
     if (typeof onRemove === "function") {
       onRemove(planId, plan);
+    }
+  };
+
+  // 삭제 버튼 클릭 시 TodayPlan을 제거 (플래너 번호가 일치할 때만 수행)
+  const handleDeletePlan = async (event, plan) => {
+    event.stopPropagation();
+
+    const planId = resolvePlanId(plan);
+    const planPlannerNo = resolvePlannerNo(plan);
+
+    if (planId === undefined || planId === null) {
+      console.warn("삭제할 일정의 ID를 찾을 수 없습니다.", plan);
+      return;
+    }
+
+    if (plannerNo === undefined || plannerNo === null) {
+      console.warn("선택된 플래너가 없어 삭제를 건너뜁니다.");
+      return;
+    }
+
+    if (planPlannerNo === undefined || planPlannerNo === null) {
+      console.warn("일정의 플래너 번호가 없어 삭제를 건너뜁니다.", plan);
+      return;
+    }
+
+    if (String(planPlannerNo) !== String(plannerNo)) {
+      console.warn("현재 플래너와 일치하지 않는 일정입니다.", plan);
+      return;
+    }
+
+    if (plan.__source === "saved") {
+      try {
+        await deleteTodayPlan(planId);
+        setSavedPlans((prev) =>
+          prev.filter((savedPlan) => {
+            const savedPlanId = resolvePlanId(savedPlan);
+            const savedPlannerNo = resolvePlannerNo(savedPlan);
+
+            if (String(savedPlannerNo) !== String(plannerNo)) {
+              return true;
+            }
+
+            return String(savedPlanId) !== String(planId);
+          })
+        );
+      } catch (error) {
+        console.error("오늘의 일정 삭제 실패:", error);
+      }
+    } else {
+      handleRemovePlan(plan);
     }
   };
 
@@ -178,6 +338,9 @@ const PlannerSidebar = ({
                       >
                         {plan.__display.title}
                       </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {plan.__display.sourceLabel}
+                      </Typography>
                       {plan.__display.address && (
                         <Typography
                           variant="body2"
@@ -193,14 +356,11 @@ const PlannerSidebar = ({
                       )}
                     </Box>
                   </Stack>
-                  <Button
+                <Button
                     variant="contained"
                     color="error"
                     size="small"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleRemovePlan(plan);
-                    }}
+                    onClick={(event) => handleDeletePlan(event, plan)}
                   >
                     삭제
                   </Button>

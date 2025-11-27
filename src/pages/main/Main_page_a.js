@@ -15,17 +15,20 @@ import {
 } from "@mui/material";
 import Navbar from "../../components/Navbar/afterLogin/Navbar_a";
 import Footer from "../../components/Footer/Footer";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SearchComponent from "../../components/Search/SearchComponent";
 import PlannerSidebar from "../../components/PlannerSidebar/PlannerSidebar";
 import TodayPlanDetailComponent from "./components/TodayPlanDetailComponent";
 import client from "../../api/client";
-import { createPlanner, getMyPlanners } from "../../api/planner";
+import { createPlanner, getMyPlanners, getPlannerByNo } from "../../api/planner";
 import {
   createTodayPlan,
   updateTodayPlan,
   deleteTodayPlan,
+  getTodayPlansByPlanner
 } from "../../api/todayplan";
+import GoogleMap from "../../components/Map/GoogleMap";
+
 
 const generateClientId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -110,72 +113,6 @@ const normalizeTimeForDisplay = (value) => {
   return "";
 };
 
-const formatDateToYMD = (date) => {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const sanitizeDateOnly = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    return formatDateToYMD(value);
-  }
-
-  if (typeof value === "string") {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      return value;
-    }
-
-    const parsed = new Date(value);
-    return formatDateToYMD(parsed);
-  }
-
-  return null;
-};
-
-const sanitizeTodaySequence = (value) => {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-
-  const numeric = Number(value);
-  if (Number.isNaN(numeric)) {
-    return null;
-  }
-
-  const intValue = Math.trunc(numeric);
-  return intValue >= 1 ? intValue : null;
-};
-
-const extractPlanDate = (plan, fallbackDate = null) =>
-  sanitizeDateOnly(
-    plan?.todayPlanDate ??
-      plan?.planDate ??
-      plan?.todayDate ??
-      plan?.travelDate ??
-      fallbackDate ??
-      null
-  );
-
-const extractPlanSequence = (plan) =>
-  sanitizeTodaySequence(
-    plan?.todayNo ??
-      plan?.sequence ??
-      plan?.order ??
-      plan?.orderNo ??
-      plan?.todayPlanOrder ??
-      null
-  );
-
 const normalizeNumeric = (value) => {
   if (value === null || value === undefined || value === "") {
     return null;
@@ -188,7 +125,7 @@ const normalizeNumeric = (value) => {
   return numeric;
 };
 
-const normalizePlan = (plan, fallbackPlannerNo, fallbackDate) => {
+const normalizePlan = (plan, fallbackPlannerNo) => {
   if (!plan) {
     return null;
   }
@@ -211,8 +148,6 @@ const normalizePlan = (plan, fallbackPlannerNo, fallbackDate) => {
     clientGeneratedId: existingId ? plan.clientGeneratedId : resolvedId,
     todayPlanNo: plan.todayPlanNo ?? plan.todayPlanId ?? null,
     plannerNo: plan.plannerNo ?? fallbackPlannerNo ?? null,
-    todayPlanDate: extractPlanDate(plan, fallbackDate),
-    todayNo: extractPlanSequence(plan),
     placeName: titleText || plan.placeName || plan.title || "",
     title: titleText || plan.title || plan.placeName || "",
     addr: addressText,
@@ -225,17 +160,6 @@ const normalizePlan = (plan, fallbackPlannerNo, fallbackDate) => {
     memo: plan.memo ?? "",
   };
 };
-
-const resolvePlannerStartDate = (planner) =>
-  sanitizeDateOnly(
-    planner?.plannerStartday ??
-      planner?.plannerStartDay ??
-      planner?.plannerStartDate ??
-      planner?.startday ??
-      planner?.startDay ??
-      planner?.startDate ??
-      null
-  );
 
 const normalizePlannerPlans = (planner) => {
   const plans =
@@ -256,8 +180,7 @@ const normalizePlannerPlans = (planner) => {
           ...plan,
           plannerNo: plan?.plannerNo ?? planner?.plannerNo ?? planner?.id ?? null,
         },
-        planner?.plannerNo ?? planner?.id ?? null,
-        resolvePlannerStartDate(planner)
+        planner?.plannerNo ?? planner?.id ?? null
       )
     )
     .filter(Boolean);
@@ -291,38 +214,6 @@ const isSameIdentifier = (plan, identifier) => {
     return false;
   }
   return String(planId) === String(identifier);
-};
-
-const deriveNextSequenceForDate = (plans, date, excludeIdentifier = null) => {
-  if (!date) {
-    return null;
-  }
-
-  const sequences = [];
-  plans.forEach((plan) => {
-    if (
-      excludeIdentifier !== null &&
-      isSameIdentifier(plan, excludeIdentifier)
-    ) {
-      return;
-    }
-
-    const planDate = extractPlanDate(plan);
-    if (planDate !== date) {
-      return;
-    }
-
-    const sequence = extractPlanSequence(plan);
-    if (sequence !== null) {
-      sequences.push(sequence);
-    }
-  });
-
-  if (sequences.length === 0) {
-    return 1;
-  }
-
-  return Math.max(...sequences) + 1;
 };
 
 const toTimeWithSeconds = (value) => {
@@ -374,43 +265,112 @@ const MainA = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const {plannerNo} = useParams();
 
-  const loadPlannerData = useCallback(
-    async (userId) => {
+
+    const fetchNextTodayNo = useCallback(
+    async (plannerNoForQuery) => {
+      if (plannerNoForQuery === undefined || plannerNoForQuery === null) {
+        return 1;
+      }
+
       try {
-        const plannerResponse = await getMyPlanners(
-          userId !== undefined && userId !== null ? { userId } : undefined
+        const response = await getTodayPlansByPlanner(
+          plannerNoForQuery,
+          currentUserId ?? undefined
         );
-        const planners = extractPlannerList(plannerResponse);
 
-        if (!planners.length) {
-          setCurrentPlanner(null);
-          setPlannerTitle("");
-          setTodayPlans([]);
-          setSelectedPlan(null);
-          setDetailOpen(false);
-          return;
+        const planList = (() => {
+          if (Array.isArray(response)) return response;
+          if (Array.isArray(response?.content)) return response.content;
+          if (Array.isArray(response?.data)) return response.data;
+          if (Array.isArray(response?.items)) return response.items;
+          if (Array.isArray(response?.todayPlans)) return response.todayPlans;
+          return [];
+        })();
+
+        if (!planList.length) {
+          return 1;
         }
 
-        const firstPlanner = planners[0];
-        setCurrentPlanner(firstPlanner);
-        const resolvedTitle = resolvePlannerTitle(firstPlanner);
-        setPlannerTitle(resolvedTitle);
-        const normalizedPlans = normalizePlannerPlans(firstPlanner);
-        setTodayPlans(normalizedPlans);
-        if (normalizedPlans.length > 0) {
-          setSelectedPlan(normalizedPlans[0]);
-          setDetailOpen(true);
-        } else {
-          setSelectedPlan(null);
-          setDetailOpen(false);
-        }
+        const maxTodayNo = planList.reduce((maxValue, plan) => {
+          const rawTodayNo =
+            plan?.todayNo ??
+            plan?.sequence ??
+            plan?.order ??
+            plan?.orderNo ??
+            null;
+          const numericTodayNo = Number(rawTodayNo);
+          if (Number.isNaN(numericTodayNo)) {
+            return maxValue;
+          }
+
+          return Math.max(maxValue, numericTodayNo);
+        }, 0);
+
+        return maxTodayNo > 0 ? maxTodayNo + 1 : 1;
       } catch (error) {
-        console.error("플래너 정보를 불러오지 못했습니다:", error);
+        console.error("다음 today_no 계산 실패:", error);
+        return 1;
       }
     },
-    []
+    [currentUserId]
   );
+
+
+
+  const loadPlannerData = useCallback(
+    async (userId, targetPlannerNo) => {
+      try {
+        const plannerResponse = await getMyPlanners(
+        userId !== undefined && userId !== null ? { userId } : undefined
+      );
+      const planners = extractPlannerList(plannerResponse);
+
+      if (!planners.length) {
+        setCurrentPlanner(null);
+        setPlannerTitle("");
+        setTodayPlans([]);
+        setSelectedPlan(null);
+        setDetailOpen(false);
+        return;
+      }
+
+      // 🔥 URL에서 온 plannerNo와 일치하는 플래너 찾기
+      let selectedPlanner = planners[0]; // 기본값: 첫 번째
+      if (targetPlannerNo !== undefined && targetPlannerNo !== null) {
+        const numericTarget = Number(targetPlannerNo);
+        if (!Number.isNaN(numericTarget)) {
+          const found = planners.find(
+            (p) => Number(p.plannerNo) === numericTarget
+          );
+          if (found) {
+            selectedPlanner = found; // URL과 일치하는 plannerNo 있으면 그걸 사용
+          }
+        }
+      }
+
+      setCurrentPlanner(selectedPlanner);
+
+      const resolvedTitle = resolvePlannerTitle(selectedPlanner);
+      setPlannerTitle(resolvedTitle);
+
+      const normalizedPlans = normalizePlannerPlans(selectedPlanner);
+      setTodayPlans(normalizedPlans);
+
+      if (normalizedPlans.length > 0) {
+        setSelectedPlan(normalizedPlans[0]);
+        setDetailOpen(true);
+      } else {
+        setSelectedPlan(null);
+        setDetailOpen(false);
+      }
+    } catch (error) {
+      console.error("플래너 정보를 불러오지 못했습니다:", error);
+    }
+  },
+  []
+);
 
   useEffect(() => {
     const initialize = async () => {
@@ -440,7 +400,8 @@ const MainA = () => {
           setOpenModal(true);
         }
 
-        await loadPlannerData(resolvedUserId ?? undefined);
+        await loadPlannerData(resolvedUserId ?? undefined, plannerNo);
+
       } catch (error) {
         console.log("요청 시 보낸 토큰:", savedToken);
         console.error("유저 정보 요청 실패:", error);
@@ -450,7 +411,7 @@ const MainA = () => {
     };
 
     initialize();
-  }, [location, navigate, loadPlannerData]);
+  }, [location, navigate, loadPlannerData, plannerNo]);
 
   const handleGoToAdditionalInfo = () => {
     setOpenModal(false);
@@ -467,9 +428,12 @@ const MainA = () => {
         address: plan.address ?? plan.addr ?? "",
         plannerNo: plan.plannerNo ?? currentPlanner?.plannerNo ?? null,
       },
-      currentPlanner?.plannerNo ?? null,
-      resolvePlannerStartDate(currentPlanner)
+      currentPlanner?.plannerNo ?? null
     );
+    //**************************씨부레 8이 나온?
+    console.log(enrichedPlan);
+
+
 
     if (!enrichedPlan) {
       return;
@@ -490,11 +454,7 @@ const MainA = () => {
     const identifier = getPlanIdentifier(plan);
     const resolvedPlan =
       todayPlans.find((item) => isSameIdentifier(item, identifier)) ??
-      normalizePlan(
-        plan,
-        currentPlanner?.plannerNo ?? null,
-        resolvePlannerStartDate(currentPlanner)
-      );
+      normalizePlan(plan, currentPlanner?.plannerNo ?? null);
     setSelectedPlan(resolvedPlan);
     setDetailOpen(true);
   };
@@ -544,198 +504,261 @@ const MainA = () => {
     endAt,
     budgetAmount,
     memo,
-    todayPlanDate,
-    todayNo,
   }) => {
-    if (!selectedPlan) {
-      return;
-    }
+  if (!selectedPlan) {
+    return;
+  }
 
-    const resolvedPlannerNo =
-      plannerNo ?? currentPlanner?.plannerNo ?? selectedPlan.plannerNo;
+  const resolvedPlannerNo =
+    plannerNo ?? currentPlanner?.plannerNo ?? selectedPlan.plannerNo;
 
-    if (!resolvedPlannerNo) {
-      alert("먼저 플래너를 저장하거나 선택해주세요.");
-      return;
-    }
+  if (!resolvedPlannerNo) {
+    alert("먼저 플래너를 저장하거나 선택해주세요.");
+    return;
+  }
 
-    const sanitizedStartAt =
-      toTimeWithSeconds(startAt) ?? toTimeWithSeconds(selectedPlan.startAt);
-    const sanitizedEndAt =
-      toTimeWithSeconds(endAt) ?? toTimeWithSeconds(selectedPlan.endAt);
+  // 1) 시간 부분을 HH:mm:ss 로 정규화
+  const sanitizedStartTime =
+    toTimeWithSeconds(startAt) ?? toTimeWithSeconds(selectedPlan.startAt);
+  const sanitizedEndTime =
+    toTimeWithSeconds(endAt) ?? toTimeWithSeconds(selectedPlan.endAt);
 
-    if (!sanitizedStartAt || !sanitizedEndAt) {
-      alert("시작 시간과 종료 시간을 올바르게 입력해주세요.");
-      return;
-    }
+  if (!sanitizedStartTime || !sanitizedEndTime) {
+    alert("시작 시간과 종료 시간을 올바르게 입력해주세요.");
+    return;
+  }
 
-    const numericBudget = normalizeNumeric(budgetAmount);
-    const resolvedBudget =
-      numericBudget ?? normalizeNumeric(selectedPlan.budgetAmount);
-    const numericPlannerNo = Number(resolvedPlannerNo);
+  // 2) 날짜 부분(todayPlanDate 등)에서 yyyy-MM-dd 추출
+  const rawDateValue =
+    selectedPlan.todayPlanDate ??
+    selectedPlan.planDate ??
+    selectedPlan.todayDate ??
+    selectedPlan.travelDate ??
+    null;
 
-    if (Number.isNaN(numericPlannerNo)) {
-      alert("선택된 플래너 정보를 확인할 수 없습니다. 다시 시도해주세요.");
-      return;
-    }
+  const extractDatePart = (value) => {
+    if (!value) return null;
 
-    const identifier = getPlanIdentifier(selectedPlan);
-    const resolvedMemo =
-      typeof memo === "string" ? memo : selectedPlan.memo ?? "";
-    const plannerStartDate = resolvePlannerStartDate(currentPlanner);
-    const sanitizedDate =
-      sanitizeDateOnly(todayPlanDate) ??
-      extractPlanDate(selectedPlan) ??
-      sanitizeDateOnly(plannerStartDate);
-
-    if (!sanitizedDate) {
-      alert("일정 날짜를 선택하거나 입력해주세요.");
-      return;
-    }
-
-    const providedSequence = sanitizeTodaySequence(todayNo);
-    const existingSequence = extractPlanSequence(selectedPlan);
-    const fallbackSequence = deriveNextSequenceForDate(
-      todayPlans,
-      sanitizedDate,
-      identifier
-    );
-    const resolvedTodayNo =
-      providedSequence ?? existingSequence ?? fallbackSequence ?? null;
-
-    const baseRequest = {
-      plannerNo: numericPlannerNo,
-      placeName: placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
-      startAt: sanitizedStartAt,
-      endAt: sanitizedEndAt,
-      ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
-      memo: resolvedMemo,
-      mapX:
-        normalizeCoordinate(selectedPlan.mapX ?? selectedPlan.mapx) ?? undefined,
-      mapY:
-        normalizeCoordinate(selectedPlan.mapY ?? selectedPlan.mapy) ?? undefined,
-      address: selectedPlan.addr ?? selectedPlan.address ?? "",
-      imageUrl: selectedPlan.imageUrl ?? selectedPlan.image ?? undefined,
-      todayPlanDate: sanitizedDate,
-    };
-
-    if (resolvedTodayNo !== null) {
-      baseRequest.todayNo = resolvedTodayNo;
-    }
-
-    const contentIdCandidate =
-      selectedPlan.contentId ??
-      selectedPlan.contentid ??
-      selectedPlan.placeId ??
-      selectedPlan.placeNo ??
-      selectedPlan.id ??
-      null;
-    if (contentIdCandidate !== null && contentIdCandidate !== undefined) {
-      const numericContentId = Number(contentIdCandidate);
-      baseRequest.contentId = Number.isNaN(numericContentId)
-        ? contentIdCandidate
-        : numericContentId;
-    }
-
-    const contentTypeIdCandidate =
-      selectedPlan.contentTypeId ?? selectedPlan.contenttypeid ?? null;
-    if (
-      contentTypeIdCandidate !== null &&
-      contentTypeIdCandidate !== undefined
-    ) {
-      const numericContentTypeId = Number(contentTypeIdCandidate);
-      baseRequest.contentTypeId = Number.isNaN(numericContentTypeId)
-        ? contentTypeIdCandidate
-        : numericContentTypeId;
-    }
-
-    try {
-      let response;
-      if (selectedPlan.todayPlanNo) {
-        response = await updateTodayPlan(selectedPlan.todayPlanNo, {
-          ...baseRequest,
-          todayPlanNo: selectedPlan.todayPlanNo,
-        });
-      } else {
-        response = await createTodayPlan(baseRequest);
+    // 문자열인 경우
+    if (typeof value === "string") {
+      // "2025-11-19T00:00:00" 같이 T가 있으면 앞부분만
+      if (value.includes("T")) {
+        return value.split("T")[0];
       }
-
-      const responseData = response ?? {};
-      const mergedPlan = normalizePlan(
-        {
-          ...selectedPlan,
-          ...responseData,
-          plannerNo: numericPlannerNo,
-          todayPlanNo:
-            responseData?.todayPlanNo ??
-            responseData?.todayPlanId ??
-            selectedPlan.todayPlanNo ??
-            null,
-          placeName:
-            placeName ??
-            responseData?.placeName ??
-            selectedPlan.placeName ??
-            selectedPlan.title ??
-            "",
-          startAt: sanitizedStartAt,
-          endAt: sanitizedEndAt,
-          budgetAmount:
-            resolvedBudget ?? normalizeNumeric(selectedPlan.budgetAmount) ?? null,
-          memo: resolvedMemo,
-          todayPlanDate:
-            responseData?.todayPlanDate ??
-            sanitizedDate,
-          todayNo:
-            responseData?.todayNo ??
-            responseData?.sequence ??
-            responseData?.order ??
-            resolvedTodayNo,
-          contentId:
-            responseData?.contentId ??
-            baseRequest.contentId ??
-            selectedPlan.contentId ??
-            selectedPlan.contentid ??
-            selectedPlan.placeId ??
-            selectedPlan.placeNo ??
-            selectedPlan.id ??
-            null,
-          contentTypeId:
-            responseData?.contentTypeId ??
-            responseData?.contenttypeid ??
-            baseRequest.contentTypeId ??
-            selectedPlan.contentTypeId ??
-            selectedPlan.contenttypeid ??
-            null,
-        },
-        numericPlannerNo,
-        sanitizedDate ?? plannerStartDate
-      );
-
-      setTodayPlans((prev) => {
-        const next = prev.map((plan) =>
-          isSameIdentifier(plan, identifier) ? mergedPlan : plan
-        );
-        if (!next.some((plan) => isSameIdentifier(plan, getPlanIdentifier(mergedPlan)))) {
-          next.push(mergedPlan);
-        }
-        return next;
-      });
-
-      setSelectedPlan(mergedPlan);
-      setDetailOpen(true);
-      alert("일정이 저장되었습니다.");
-    } catch (error) {
-      console.error("오늘의 일정 저장 실패:", error);
-      let message = "일정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
-        message = "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 이용해주세요.";
-      } else if (error?.code === "ERR_NETWORK") {
-        message =
-          "서버에 연결할 수 없습니다. 로그인 상태를 확인한 뒤 다시 시도해주세요.";
-      }
-      alert(message);
+      // "2025-11-19" 형태라고 가정
+      return value.slice(0, 10);
     }
+
+    // Date 객체인 경우
+    if (value instanceof Date) {
+      return value.toISOString().slice(0, 10); // yyyy-MM-dd
+    }
+
+    return null;
   };
+
+  let datePart = extractDatePart(rawDateValue);
+
+  // 만약 날짜가 전혀 없다면, 오늘 날짜로 fallback
+  if (!datePart) {
+    datePart = new Date().toISOString().slice(0, 10); // yyyy-MM-dd
+  }
+
+  // 3) LocalDateTime 형식으로 합치기: yyyy-MM-ddTHH:mm:ss
+  const startDateTime = `${datePart}T${sanitizedStartTime}`;
+  const endDateTime = `${datePart}T${sanitizedEndTime}`;
+
+  const numericBudget = normalizeNumeric(budgetAmount);
+  const resolvedBudget =
+    numericBudget ?? normalizeNumeric(selectedPlan.budgetAmount);
+  const numericPlannerNo = Number(resolvedPlannerNo);
+
+  if (Number.isNaN(numericPlannerNo)) {
+    alert("선택된 플래너 정보를 확인할 수 없습니다. 다시 시도해주세요.");
+    return;
+  }
+
+  const identifier = getPlanIdentifier(selectedPlan);
+  const resolvedMemo =
+    typeof memo === "string" ? memo : selectedPlan.memo ?? "";
+
+  const todaySequence =
+    selectedPlan.todayNo ??
+    selectedPlan.sequence ??
+    selectedPlan.order ??
+    selectedPlan.orderNo ??
+    null;
+
+
+    //수정********************************************************return값을 +1씩 증가시켜야해요.
+  const resolvedTodayNo = (() => {
+    if (todaySequence !== null && todaySequence !== undefined) {
+      const numericTodayNo = Number(todaySequence);
+      console.log(todaySequence);
+      if(!Number.isNaN(numericTodayNo) && numericTodayNo> 0){
+        return numericTodayNo;
+      }
+
+    }
+    else console.log("no numericTodayNo");
+    return fetchNextTodayNo(numericPlannerNo);
+
+  })();
+
+
+  const placeTypeCandidate =
+    selectedPlan.placeTypeId ??
+    selectedPlan.placeTypeNo ??
+    selectedPlan.placeType?.id ??
+    selectedPlan.contentTypeId ??
+    selectedPlan.contenttypeid ??
+    null;
+  const resolvedPlaceTypeId = (() => {
+    if (placeTypeCandidate === null || placeTypeCandidate === undefined) {
+      return null;
+    }
+    const numericType = Number(placeTypeCandidate);
+    return Number.isNaN(numericType) ? null : numericType;
+  })();
+
+  const placeRefCandidate =
+    selectedPlan.placeRef ??
+    selectedPlan.contentId ??
+    selectedPlan.contentid ??
+    selectedPlan.placeId ??
+    selectedPlan.placeNo ??
+    selectedPlan.id ??
+    null;
+
+  const todayPlanDate =
+    selectedPlan.todayPlanDate ??
+    selectedPlan.planDate ??
+    selectedPlan.todayDate ??
+    selectedPlan.travelDate ??
+    null;
+
+  const baseRequest = {
+    plannerNo: numericPlannerNo,
+    todayNo: resolvedTodayNo,
+    placeName:
+      placeName ?? selectedPlan.placeName ?? selectedPlan.title ?? "",
+    startAt: startDateTime,
+    endAt: endDateTime,
+    ...(resolvedBudget !== null ? { budgetAmount: resolvedBudget } : {}),
+    memo: resolvedMemo,
+  };
+
+  if (resolvedPlaceTypeId !== null) {
+    baseRequest.placeTypeId = resolvedPlaceTypeId;
+  }
+
+  if (placeRefCandidate !== null && placeRefCandidate !== undefined) {
+    baseRequest.placeRef = String(placeRefCandidate);
+  }
+
+  try {
+    let response;
+    if (selectedPlan.todayPlanNo) {
+      response = await updateTodayPlan(selectedPlan.todayPlanNo, {
+        ...baseRequest,
+        todayPlanNo: selectedPlan.todayPlanNo,
+      });
+    } else {
+      response = await createTodayPlan(baseRequest);
+    }
+
+    const responseData = response ?? {};
+    const mergedPlan = normalizePlan(
+      {
+        ...selectedPlan,
+        ...responseData,
+        plannerNo: numericPlannerNo,
+        todayPlanNo:
+          responseData?.todayPlanNo ??
+          responseData?.todayPlanId ??
+          selectedPlan.todayPlanNo ??
+          null,
+        placeName:
+          placeName ??
+          responseData?.placeName ??
+          selectedPlan.placeName ??
+          selectedPlan.title ??
+          "",
+        // 여기에는 LocalDateTime을 넣지만, normalizePlan에서 화면용 HH:mm로 다시 잘라줄 것
+        startAt: startDateTime,
+        endAt: endDateTime,
+        budgetAmount:
+          resolvedBudget ?? normalizeNumeric(selectedPlan.budgetAmount) ?? null,
+        memo: resolvedMemo,
+        todayPlanDate:
+          responseData?.todayPlanDate ??
+          todayPlanDate ??
+          selectedPlan.todayPlanDate ??
+          selectedPlan.planDate ??
+          selectedPlan.todayDate ??
+          null,
+        todayNo:
+          responseData?.todayNo ??
+          responseData?.sequence ??
+          responseData?.order ??
+          todaySequence ??
+          selectedPlan.todayNo ??
+          selectedPlan.sequence ??
+          selectedPlan.order ??
+          selectedPlan.orderNo ??
+          null,
+        contentId:
+          responseData?.contentId ??
+          baseRequest.contentId ??
+          selectedPlan.contentId ??
+          selectedPlan.contentid ??
+          selectedPlan.placeId ??
+          selectedPlan.placeNo ??
+          selectedPlan.id ??
+          null,
+        contentTypeId:
+          responseData?.contentTypeId ??
+          responseData?.contenttypeid ??
+          baseRequest.contentTypeId ??
+          selectedPlan.contentTypeId ??
+          selectedPlan.contenttypeid ??
+          null,
+      },
+      numericPlannerNo
+    );
+
+    setTodayPlans((prev) => {
+      const next = prev.map((plan) =>
+        isSameIdentifier(plan, identifier) ? mergedPlan : plan
+      );
+      if (
+        !next.some((plan) =>
+          isSameIdentifier(plan, getPlanIdentifier(mergedPlan))
+        )
+      ) {
+        next.push(mergedPlan);
+      }
+      return next;
+    });
+
+    setSelectedPlan(mergedPlan);
+    setDetailOpen(true);
+    alert("일정이 저장되었습니다.");
+  } catch (error) {
+    console.error("오늘의 일정 저장 실패:", error);
+    let message = "일정을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.";
+    if (error?.response?.status === 401 || error?.response?.status === 403) {
+      message = "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 이용해주세요.";
+    } else if (error?.code === "ERR_NETWORK") {
+      message =
+        "서버에 연결할 수 없습니다. 로그인 상태를 확인한 뒤 다시 시도해주세요.";
+      console.log("saved accessToken:", localStorage.getItem("accessToken"));
+
+    }
+    alert(message);
+  }
+};
+
 
   const handleCancelDetail = () => {
     setDetailOpen(false);
@@ -791,12 +814,23 @@ const MainA = () => {
   return (
     <>
       <Navbar />
-      <Container>
-        <Box sx={{ display: "flex", gap: 4, alignItems: "flex-start", my: 4 }}>
+      <Container maxWidth={false} sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: { xs: 3, lg: 4 },
+            alignItems: "stretch",
+            justifyContent: "flex-start",
+            width: "100%",
+            maxWidth: "1600px",
+            mx: "auto",
+          }}
+        >
           <PlannerSidebar
             plannerTitle={plannerTitle}
             onTitleChange={setPlannerTitle}
             todayPlans={todayPlans}
+            plannerNo={currentPlanner?.plannerNo}
             onSelectPlan={handleSelectSidebarItem}
             selectedPlanId={selectedPlanId}
             onRemove={handleRemovePlan}
@@ -804,16 +838,65 @@ const MainA = () => {
           />
           <Box
             sx={{
-              flex: 1,
-              display: "flex",
-              gap: 3,
-              alignItems: "flex-start",
-              minHeight: 420,
+              flex: 1.2,
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                lg: "minmax(520px, 1.7fr) 360px",
+              },
+              columnGap: { xs: 3, lg: 4 },
+              rowGap: 3,
+              alignItems: "start",
+              minHeight: 520,
             }}
           >
-            <Box sx={{ flex: 1 }}>
-              <SearchComponent onAddPlan={handleAddPlan} />
-            </Box>
+             <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 3,
+                alignItems: "stretch",
+                width: "100%",
+              }}
+            >
+              <Box sx={{ maxWidth: 380, width: "100%" }}>
+                <SearchComponent onAddPlan={handleAddPlan} />
+              </Box>
+              <Paper
+                sx={{
+                  p: { xs: 3, md: 4 },
+                  width: "100%",
+                  height: "100%",
+                  minHeight: { xs: 520, md: 620 },
+                  borderRadius: 4,
+                  boxShadow: "0 22px 50px rgba(0, 0, 0, 0.14)",
+                  background: "linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 2.5,
+                }}
+                elevation={3}
+              >
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 800,
+                    letterSpacing: "-0.02em",
+                    textAlign: "left",
+                  }}
+                >
+                  지도
+                </Typography>
+                <Box sx={{ flex: 1, minHeight: { xs: 440, md: 520 } }}>
+                  <GoogleMap
+                    query={
+                      selectedPlan?.placeName || selectedPlan?.title || "Seoul"
+                    }
+                    height="100%"
+                  />
+                </Box>
+              </Paper>
+              </Box>
             {detailOpen && selectedPlan ? (
               <TodayPlanDetailComponent
                 place={selectedPlan}
@@ -843,35 +926,5 @@ const MainA = () => {
           </Box>
         </Box>
       </Container>
-      <Footer />
-
-      {/* ... (Dialog 관련 코드는 그대로) ... */}
-      <Dialog open={openModal} onClose={() => setOpenModal(false)}>
-        <DialogTitle>추가 정보 입력 필요</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            처음 로그인하신 것 같아요! 닉네임 등 추가 정보를 입력해주세요.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenModal(false)}>닫기</Button>
-          <Button
-            onClick={handleGoToAdditionalInfo}
-            variant="contained"
-            sx={{
-              backgroundColor: "#d71f1c",
-              "&:hover": {
-                backgroundColor: "#b81a18",
-              },
-              color: "#fff",
-            }}
-          >
-            입력하러 가기
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
-};
-
-export default MainA;
+     <Footer />
+          

@@ -121,7 +121,8 @@ const MainPlan = () => {
     [refreshPlanners, userId]
   );
 
-  const handleGoToDetail = useCallback(
+  //PlannerNo
+  const handleGoToDetail = useCallback( 
     (plannerNo) => {
       navigate(`/main/plan/detail/${plannerNo}`);
     },
