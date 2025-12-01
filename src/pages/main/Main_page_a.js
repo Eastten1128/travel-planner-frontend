@@ -896,6 +896,12 @@ const MainA = () => {
             onTitleChange={setPlannerTitle}
             todayPlans={todayPlans}
             plannerNo={currentPlanner?.plannerNo}
+            plannerStartday={
+              currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday
+            }
+            plannerEndday={
+              currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday
+            }
             onSelectPlan={handleSelectSidebarItem}
             selectedPlanId={selectedPlanId}
             onRemove={handleRemovePlan}

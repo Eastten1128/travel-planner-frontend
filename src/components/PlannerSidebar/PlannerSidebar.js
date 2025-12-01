@@ -17,6 +17,8 @@ const PlannerSidebar = ({
   onTitleChange,
   todayPlans = [],
   plannerNo,
+  plannerStartday,
+  plannerEndday,
   onSelectPlan,
   selectedPlanId,
   onRemove,
@@ -173,6 +175,127 @@ const PlannerSidebar = ({
     [combinedPlans]
   );
 
+  const parseDateValue = (value) => {
+    if (!value) return null;
+
+    const direct = new Date(value);
+    if (!Number.isNaN(direct.getTime())) {
+      return direct;
+    }
+
+    if (typeof value === "string" && value.includes(" ")) {
+      const spaced = new Date(value.replace(" ", "T"));
+      if (!Number.isNaN(spaced.getTime())) {
+        return spaced;
+      }
+    }
+
+    return null;
+  };
+
+  const startDateBase = useMemo(() => {
+    const parsed = parseDateValue(plannerStartday);
+    if (!parsed) return null;
+    const midnight = new Date(parsed);
+    midnight.setHours(0, 0, 0, 0);
+    return midnight;
+  }, [plannerStartday]);
+
+  const endDateBase = useMemo(() => {
+    const parsed = parseDateValue(plannerEndday);
+    if (!parsed) return null;
+    const midnight = new Date(parsed);
+    midnight.setHours(0, 0, 0, 0);
+    return midnight;
+  }, [plannerEndday]);
+
+  const msPerDay = 1000 * 60 * 60 * 24;
+
+  const clampDayIndex = (dayIndex) => {
+    if (dayIndex === null || dayIndex === undefined || Number.isNaN(dayIndex)) {
+      return 0;
+    }
+
+    let clamped = dayIndex;
+
+    if (clamped < 0) {
+      clamped = 0;
+    }
+
+    if (startDateBase && endDateBase) {
+      const maxIndex = Math.max(
+        0,
+        Math.floor((endDateBase.getTime() - startDateBase.getTime()) / msPerDay)
+      );
+      if (clamped > maxIndex) {
+        clamped = maxIndex;
+      }
+    }
+
+    return clamped;
+  };
+
+  const getPlanDate = (plan) =>
+    parseDateValue(plan?.startAt ?? plan?.todayPlanDate ?? plan?.date ?? null);
+
+  const formatDateLabel = (date) => {
+    if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+      return "날짜 미지정";
+    }
+
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${month}/${day}`;
+  };
+
+  const groupedPlans = useMemo(() => {
+    const sortedPlans = [...normalizedPlans].sort((a, b) => {
+      const dateA = getPlanDate(a);
+      const dateB = getPlanDate(b);
+
+      if (dateA && dateB) {
+        return dateA.getTime() - dateB.getTime();
+      }
+
+      if (dateA) return -1;
+      if (dateB) return 1;
+
+      const idA = resolvePlanId(a);
+      const idB = resolvePlanId(b);
+      return String(idA ?? "").localeCompare(String(idB ?? ""));
+    });
+
+    const groupMap = new Map();
+
+    sortedPlans.forEach((plan) => {
+      const planDate = getPlanDate(plan);
+      const planMidnight = planDate
+        ? new Date(planDate.setHours(0, 0, 0, 0))
+        : null;
+
+      let dayIndex = 0;
+      if (planMidnight && startDateBase) {
+        dayIndex = Math.floor(
+          (planMidnight.getTime() - startDateBase.getTime()) / msPerDay
+        );
+      }
+
+      dayIndex = clampDayIndex(dayIndex);
+
+      if (!groupMap.has(dayIndex)) {
+        groupMap.set(dayIndex, {
+          dayIndex,
+          date: planMidnight ?? startDateBase ?? null,
+          plans: [],
+        });
+      }
+
+      groupMap.get(dayIndex).plans.push(plan);
+    });
+
+    return Array.from(groupMap.values()).sort((a, b) => a.dayIndex - b.dayIndex);
+  }, [normalizedPlans, startDateBase, endDateBase]);
+
   const handleRemovePlan = (plan) => {
     const planId = resolvePlanId(plan);
     if (typeof onRemove === "function") {
@@ -292,81 +415,100 @@ const PlannerSidebar = ({
             등록하세요.
           </Typography>
         ) : (
-          <Stack spacing={1}>
-            {normalizedPlans.map((plan) => {
-              const planId = plan.__display.id;
-              const isSelected = isPlanSelected(planId);
-              return (
-                <Paper
-                  key={planId ?? plan.__display.title}
-                  variant={isSelected ? "elevation" : "outlined"}
-                  elevation={isSelected ? 6 : 0}
-                  onClick={() => handleSelectPlan(plan)}
-                  sx={{
-                    p: 1.5,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 1,
-                    cursor: "pointer",
-                    transition: "background-color 0.2s ease, box-shadow 0.2s ease",
-                    bgcolor: isSelected ? "rgba(58, 141, 151, 0.16)" : "inherit",
-                    borderColor: isSelected ? "#3a8d97" : undefined,
-                    "&:hover": {
-                      bgcolor: "rgba(58, 141, 151, 0.08)",
-                    },
-                  }}
+          <Stack spacing={2}>
+            {groupedPlans.map((group) => (
+              <Box key={group.dayIndex}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{ fontWeight: 700, mb: 1, color: "#3a8d97" }}
                 >
-                  <Stack direction="row" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
-                    {plan.__display.image && (
-                      <Avatar
-                        src={plan.__display.image}
-                        alt={plan.__display.title}
-                        variant="rounded"
-                        sx={{ width: 48, height: 48 }}
-                      />
-                    )}
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="body1"
+                  {group.dayIndex + 1}일차 ({formatDateLabel(group.date)})
+                </Typography>
+                <Stack spacing={1}>
+                  {group.plans.map((plan) => {
+                    const planId = plan.__display.id;
+                    const isSelected = isPlanSelected(planId);
+                    return (
+                      <Paper
+                        key={planId ?? plan.__display.title}
+                        variant={isSelected ? "elevation" : "outlined"}
+                        elevation={isSelected ? 6 : 0}
+                        onClick={() => handleSelectPlan(plan)}
                         sx={{
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          p: 1.5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1,
+                          cursor: "pointer",
+                          transition:
+                            "background-color 0.2s ease, box-shadow 0.2s ease",
+                          bgcolor: isSelected
+                            ? "rgba(58, 141, 151, 0.16)"
+                            : "inherit",
+                          borderColor: isSelected ? "#3a8d97" : undefined,
+                          "&:hover": {
+                            bgcolor: "rgba(58, 141, 151, 0.08)",
+                          },
                         }}
                       >
-                        {plan.__display.title}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {plan.__display.sourceLabel}
-                      </Typography>
-                      {plan.__display.address && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
+                        <Stack
+                          direction="row"
+                          spacing={1.5}
+                          sx={{ flex: 1, minWidth: 0 }}
                         >
-                          {plan.__display.address}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Stack>
-                <Button
-                    variant="contained"
-                    color="error"
-                    size="small"
-                    onClick={(event) => handleDeletePlan(event, plan)}
-                  >
-                    삭제
-                  </Button>
-                </Paper>
-              );
-            })}
+                          {plan.__display.image && (
+                            <Avatar
+                              src={plan.__display.image}
+                              alt={plan.__display.title}
+                              variant="rounded"
+                              sx={{ width: 48, height: 48 }}
+                            />
+                          )}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="body1"
+                              sx={{
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                            >
+                              {plan.__display.title}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {plan.__display.sourceLabel}
+                            </Typography>
+                            {plan.__display.address && (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {plan.__display.address}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Stack>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          onClick={(event) => handleDeletePlan(event, plan)}
+                        >
+                          삭제
+                        </Button>
+                      </Paper>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            ))}
           </Stack>
         )}
       </Box>
