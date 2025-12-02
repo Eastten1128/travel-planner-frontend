@@ -1,3 +1,7 @@
+/**
+ * 새 여행(플래너) 정보를 입력받아 생성하는 모달/섹션 컴포넌트.
+ * 입력 검증, API 호출, 성공/에러 처리 로직을 포함하며 부모로 성공 결과를 전달한다.
+ */
 import { useState } from "react";
 import { createPlanner } from "../api/planner";
 
@@ -8,20 +12,23 @@ const initialForm = {
 };
 
 const CreatePlan = ({ userId, onSuccess, onClose }) => {
-  const [form, setForm] = useState(initialForm);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [form, setForm] = useState(initialForm); // 입력 폼 상태
+  const [submitting, setSubmitting] = useState(false); // 제출 진행 여부
+  const [error, setError] = useState(null); // 검증/요청 오류 메시지
 
+  // 입력 필드 변경 시 해당 name에 맞춰 상태 업데이트
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // 폼 초기화 및 에러 메시지 리셋
   const resetForm = () => {
     setForm(initialForm);
     setError(null);
   };
 
+  // 여행 생성 폼 제출 핸들러: 필수값 검증 후 createPlanner API 호출
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
