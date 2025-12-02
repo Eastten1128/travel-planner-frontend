@@ -1,9 +1,13 @@
+/**
+ * 상단 내비게이션과 기본 레이아웃을 제공하는 페이지 래퍼 컴포넌트.
+ * 특정 경로에서는 "새 여행 만들기" 버튼을 숨기고, 로그아웃 콜백을 전달받아 실행한다.
+ */
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 
 function PageShell({ children, onLogout }) {
   const location = useLocation();
-  const isCreatePage = location.pathname === "/createplan";
+  const isCreatePage = location.pathname === "/createplan"; // 생성 페이지 여부에 따라 CTA 노출 조절
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -31,6 +35,7 @@ function PageShell({ children, onLogout }) {
           </div>
         </div>
       </header>
+      {/* 페이지 콘텐츠 영역: children을 그대로 렌더링 */}
       <main className="mx-auto max-w-5xl px-4 py-10 md:px-8">{children}</main>
     </div>
   );

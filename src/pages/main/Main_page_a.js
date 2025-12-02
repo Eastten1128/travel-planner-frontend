@@ -1,4 +1,10 @@
 // src/pages/MainA.js (또는 MainA.js 파일 경로)
+/**
+ * 메인 플래너 화면 컴포넌트.
+ * - 로그인 토큰을 확인하고 사용자/플래너 데이터를 로드
+ * - 검색 결과를 플래너에 추가하고, 일정 상세를 수정/삭제/저장
+ * - 지도와 사이드바, 상세 패널로 구성된 레이아웃을 렌더링한다.
+ */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -30,6 +36,7 @@ import {
 import GoogleMap from "../../components/Map/GoogleMap";
 
 
+// 로컬에서 임시로 식별자를 생성해 중복 추가를 방지
 const generateClientId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -37,6 +44,7 @@ const generateClientId = () => {
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 
+// 다양한 응답 형태에서 플래너 배열만 추출하는 헬퍼
 const extractPlannerList = (data) => {
   if (!data) {
     return [];
@@ -69,6 +77,7 @@ const extractPlannerList = (data) => {
   return [];
 };
 
+// plan 객체에서 식별자로 사용할 ID를 우선순위에 따라 찾아 반환
 const ensurePlanId = (plan) => {
   const candidate =
     plan?.todayPlanNo ??
@@ -84,6 +93,7 @@ const ensurePlanId = (plan) => {
   return candidate !== undefined && candidate !== null ? candidate : null;
 };
 
+// Date/문자열 시간을 HH:mm 형태로 정리해 화면 표시용으로 사용
 const normalizeTimeForDisplay = (value) => {
   if (!value) {
     return "";
@@ -178,6 +188,7 @@ const extractDatePart = (value) => {
   return null;
 };
 
+// 백엔드 응답/검색 결과를 화면에서 사용하기 좋은 TodayPlan 구조로 변환
 const normalizePlan = (plan, fallbackPlannerNo) => {
   if (!plan) {
     return null;
@@ -251,6 +262,7 @@ const normalizePlan = (plan, fallbackPlannerNo) => {
   };
 };
 
+// 플래너 객체 내 포함된 TodayPlan 리스트를 정규화하여 배열로 반환
 const normalizePlannerPlans = (planner) => {
   const plans =
     planner?.todayPlanResponseList ??
@@ -276,8 +288,10 @@ const normalizePlannerPlans = (planner) => {
     .filter(Boolean);
 };
 
+// UI 제목으로 사용할 플래너 타이틀 계산
 const resolvePlannerTitle = (planner) => planner?.plannerTitle ?? planner?.title ?? "";
 
+// plan을 고유하게 구분할 ID를 문자열로 추출
 const getPlanIdentifier = (plan) => {
   const candidate = ensurePlanId(plan);
   if (candidate !== null) {
@@ -321,16 +335,17 @@ const normalizeCoordinate = (value) => {
 const MainA = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [openModal, setOpenModal] = useState(false);
-  const [plannerTitle, setPlannerTitle] = useState("");
-  const [todayPlans, setTodayPlans] = useState([]);
-  const [currentPlanner, setCurrentPlanner] = useState(null);
-  const [selectedPlan, setSelectedPlan] = useState(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [openModal, setOpenModal] = useState(false); // 추가 정보 입력 모달 표시 여부
+  const [plannerTitle, setPlannerTitle] = useState(""); // 현재 선택된 플래너 제목
+  const [todayPlans, setTodayPlans] = useState([]); // 임시+저장된 TodayPlan 목록
+  const [currentPlanner, setCurrentPlanner] = useState(null); // 선택된 플래너 정보
+  const [selectedPlan, setSelectedPlan] = useState(null); // 상세 패널에 표시 중인 일정
+  const [detailOpen, setDetailOpen] = useState(false); // 상세 패널 표시 여부
+  const [currentUserId, setCurrentUserId] = useState(null); // 로그인한 사용자 ID
   const {plannerNo} = useParams();
 
 
+    // 현재 플래너의 today_no 최대값을 조회하여 다음 순번 계산
     const fetchNextTodayNo = useCallback(
     async (plannerNoForQuery) => {
       if (plannerNoForQuery === undefined || plannerNoForQuery === null) {
@@ -382,6 +397,7 @@ const MainA = () => {
 
 
 
+  // 사용자 ID와 URL 파라미터를 기준으로 플래너/오늘의 일정 데이터를 불러오기
   const loadPlannerData = useCallback(
     async (userId, targetPlannerNo) => {
       try {
@@ -436,6 +452,7 @@ const MainA = () => {
 );
 
   useEffect(() => {
+    // 첫 렌더링 시 토큰 확인, 유저 정보 조회, 플래너 데이터 로딩
     const initialize = async () => {
       const query = new URLSearchParams(location.search);
       const token = query.get("token");
@@ -476,11 +493,13 @@ const MainA = () => {
     initialize();
   }, [location, navigate, loadPlannerData, plannerNo]);
 
+  // 추가 정보 입력 모달의 CTA 클릭 시 추가정보 페이지로 이동
   const handleGoToAdditionalInfo = () => {
     setOpenModal(false);
     navigate("/additional-info");
   };
 
+  // 검색 결과/임시 데이터를 받아 TodayPlan 형태로 정규화 후 목록에 추가
   const handleAddPlan = (plan) => {
     const enrichedPlan = normalizePlan(
       {
@@ -513,6 +532,7 @@ const MainA = () => {
     setDetailOpen(true);
   };
 
+  // 사이드바에서 일정 클릭 시 선택 상태와 상세 패널 동기화
   const handleSelectSidebarItem = (plan) => {
     const identifier = getPlanIdentifier(plan);
     const resolvedPlan =
@@ -522,6 +542,7 @@ const MainA = () => {
     setDetailOpen(true);
   };
 
+  // 일정 삭제: 저장된 경우 API 호출 후 목록/선택 상태 갱신
   const handleRemovePlan = async (planId, plan) => {
     const targetPlan =
       plan ?? todayPlans.find((item) => isSameIdentifier(item, planId));
@@ -560,6 +581,7 @@ const MainA = () => {
     }
   };
 
+  // 상세 패널에서 입력받은 정보를 검증 후 TodayPlan 생성/수정 요청
   const handleSaveTodayPlan = async ({
     plannerNo,
     placeName,
@@ -826,6 +848,7 @@ const MainA = () => {
 };
 
 
+  // 상세 패널 닫기 버튼
   const handleCancelDetail = () => {
     setDetailOpen(false);
   };
@@ -877,6 +900,7 @@ const MainA = () => {
     [selectedPlan]
   );
 
+  // 페이지 레이아웃: 좌측 사이드바 + 우측 검색/지도/상세 정보 영역
   return (
     <>
       <Navbar />

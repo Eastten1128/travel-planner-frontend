@@ -1,3 +1,8 @@
+/**
+ * 플래너 상세 화면 좌측에 노출되는 사이드바 컴포넌트.
+ * - 플래너 제목 수정, 저장
+ * - 선택한 플래너에 속한 오늘의 일정 목록 표시 및 삭제/선택 기능을 담당한다.
+ */
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Avatar,
@@ -24,22 +29,25 @@ const PlannerSidebar = ({
   onRemove,
   onSave,
 }) => {
-  const [titleInput, setTitleInput] = useState(plannerTitle ?? "");
-  const [savedPlans, setSavedPlans] = useState([]);
+  const [titleInput, setTitleInput] = useState(plannerTitle ?? ""); // 제목 입력 필드 상태
+  const [savedPlans, setSavedPlans] = useState([]); // 서버에 저장된 TodayPlan 목록 캐시
 
   useEffect(() => {
     let active = true;
 
     const fetchSavedPlans = async () => {
+      // 플래너 번호가 없으면 저장된 일정이 없다고 판단하고 초기화
       if (plannerNo === undefined || plannerNo === null) {
         setSavedPlans([]);
         return;
       }
 
       try {
+        // 선택된 플래너 번호로 TodayPlan을 조회
         const data = await getTodayPlansByPlanner(plannerNo);
         if (!active) return;
 
+        // API 응답 형식이 다양할 수 있어 여러 형태를 안전하게 파싱
         const planList = (() => {
           if (Array.isArray(data)) return data;
           if (Array.isArray(data?.content)) return data.content;
@@ -49,6 +57,7 @@ const PlannerSidebar = ({
           return [];
         })();
 
+        // 서버에서 가져온 일정에 __source 플래그를 붙여 저장됨/임시 여부 구분
         setSavedPlans(
           planList.map((plan) => ({
             ...plan,
@@ -67,14 +76,17 @@ const PlannerSidebar = ({
     fetchSavedPlans();
 
     return () => {
+      // 비동기 처리 후 언마운트 상황 방지
       active = false;
     };
   }, [plannerNo]);
 
   useEffect(() => {
+    // 상위에서 플래너 제목이 변경될 때 입력 필드 동기화
     setTitleInput(plannerTitle ?? "");
   }, [plannerTitle]);
 
+  // 플래너 제목 입력 값 변경 시 상위 콜백에 전달
   const handleChangeTitle = (event) => {
     const nextValue = event.target.value;
     setTitleInput(nextValue);
@@ -83,6 +95,7 @@ const PlannerSidebar = ({
     }
   };
 
+  // 다양한 응답 형태에서 TodayPlan ID를 추출하기 위한 헬퍼
   const resolvePlanId = (plan) =>
     plan?.todayPlanNo ??
     plan?.todayPlanId ??
@@ -94,9 +107,11 @@ const PlannerSidebar = ({
     plan?.clientGeneratedId ??
     null;
 
-    const resolvePlannerNo = (plan) =>
+  // plan 객체에서 플래너 번호를 안전하게 추출
+  const resolvePlannerNo = (plan) =>
     plan?.plannerNo ?? plan?.plannerId ?? plan?.plannerid ?? null;
 
+  // 아직 저장되지 않은 임시 일정(todayPlans) 중 현재 플래너에 해당하는 것만 선별
   const filteredDraftPlans = useMemo(() => {
     if (plannerNo === undefined || plannerNo === null) {
       return todayPlans;
@@ -112,6 +127,7 @@ const PlannerSidebar = ({
     });
   }, [plannerNo, todayPlans]);
 
+  // 서버에서 가져온 저장된 일정 중 현재 플래너에 해당하는 것만 선별
   const filteredSavedPlans = useMemo(() => {
     if (plannerNo === undefined || plannerNo === null) {
       return savedPlans;
@@ -127,6 +143,7 @@ const PlannerSidebar = ({
     });
   }, [plannerNo, savedPlans]);
 
+  // 임시 일정과 저장된 일정을 합치고, 같은 ID가 중복될 경우 하나만 유지
   const combinedPlans = useMemo(() => {
     const decoratedDrafts = filteredDraftPlans.map((plan) => ({
       ...plan,
@@ -155,6 +172,7 @@ const PlannerSidebar = ({
     });
   }, [filteredDraftPlans, filteredSavedPlans]);
 
+  // UI에서 바로 사용할 수 있도록 제목/주소/이미지 등 표시용 필드 구성
   const normalizedPlans = useMemo(
     () =>
       combinedPlans.map((plan) => {
@@ -175,6 +193,7 @@ const PlannerSidebar = ({
     [combinedPlans]
   );
 
+  // 날짜 문자열을 Date 객체로 변환하되 잘못된 포맷은 null 처리
   const parseDateValue = (value) => {
     if (!value) return null;
 
@@ -193,6 +212,7 @@ const PlannerSidebar = ({
     return null;
   };
 
+  // 플래너 시작일을 00:00 시점으로 맞춰 그룹핑 기준일 계산
   const startDateBase = useMemo(() => {
     const parsed = parseDateValue(plannerStartday);
     if (!parsed) return null;
@@ -201,6 +221,7 @@ const PlannerSidebar = ({
     return midnight;
   }, [plannerStartday]);
 
+  // 플래너 종료일을 00:00 기준으로 계산해 마지막 일차를 제한
   const endDateBase = useMemo(() => {
     const parsed = parseDateValue(plannerEndday);
     if (!parsed) return null;
@@ -209,8 +230,10 @@ const PlannerSidebar = ({
     return midnight;
   }, [plannerEndday]);
 
+  // 하루를 밀리초로 환산한 상수 (일차 계산용)
   const msPerDay = 1000 * 60 * 60 * 24;
 
+  // 일차가 범위를 벗어나지 않도록 0 ~ (여행일수-1) 사이로 보정
   const clampDayIndex = (dayIndex) => {
     if (dayIndex === null || dayIndex === undefined || Number.isNaN(dayIndex)) {
       return 0;
@@ -235,9 +258,11 @@ const PlannerSidebar = ({
     return clamped;
   };
 
+  // 일정에서 날짜 정보 추출 (시작 시간이 우선)
   const getPlanDate = (plan) =>
     parseDateValue(plan?.startAt ?? plan?.todayPlanDate ?? plan?.date ?? null);
 
+  // 그룹 헤더에 표시할 월/일 라벨 생성
   const formatDateLabel = (date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
       return "날짜 미지정";
@@ -248,6 +273,7 @@ const PlannerSidebar = ({
     return `${month}/${day}`;
   };
 
+  // 일정 목록을 날짜 기준으로 정렬 후 일차별로 묶어 UI에 전달
   const groupedPlans = useMemo(() => {
     const sortedPlans = [...normalizedPlans].sort((a, b) => {
       const dateA = getPlanDate(a);
@@ -296,6 +322,7 @@ const PlannerSidebar = ({
     return Array.from(groupMap.values()).sort((a, b) => a.dayIndex - b.dayIndex);
   }, [normalizedPlans, startDateBase, endDateBase]);
 
+  // 임시 일정 삭제 요청을 상위 콜백으로 전달
   const handleRemovePlan = (plan) => {
     const planId = resolvePlanId(plan);
     if (typeof onRemove === "function") {
@@ -353,6 +380,7 @@ const PlannerSidebar = ({
     }
   };
 
+  // 사이드바 아이템 클릭 시 상세 패널에 표시할 일정 선택
   const handleSelectPlan = (plan) => {
     if (typeof onSelectPlan !== "function") {
       return;
@@ -361,6 +389,7 @@ const PlannerSidebar = ({
     onSelectPlan(plan);
   };
 
+  // 현재 선택된 일정인지 여부를 비교해 강조 스타일 적용
   const isPlanSelected = (planId) => {
     if (selectedPlanId === undefined || selectedPlanId === null) {
       return false;

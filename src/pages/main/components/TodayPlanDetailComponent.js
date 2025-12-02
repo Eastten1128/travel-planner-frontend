@@ -1,5 +1,10 @@
+/**
+ * 선택된 TodayPlan의 상세 정보를 편집하고 저장하는 사이드 패널 컴포넌트.
+ * 날짜/시간, 예산, 메모를 검증한 뒤 저장 콜백으로 전달한다.
+ */
 import React, { useEffect, useState } from "react";
 
+// Date/시간 값을 <input type="time">에서 사용할 수 있는 HH:mm 문자열로 변환
 const toTimeInputValue = (value) => {
   if (!value) {
     return "";
@@ -29,6 +34,7 @@ const toTimeInputValue = (value) => {
   return "";
 };
 
+// 입력된 시간 문자열을 HH:mm 형태로 정규화
 const sanitizeTimeInput = (value) => {
   if (!value) {
     return "";
@@ -50,6 +56,7 @@ const sanitizeTimeInput = (value) => {
   return "";
 };
 
+// Date/문자열을 <input type="date">에서 쓸 수 있는 YYYY-MM-DD 로 변환
 const toDateInputValue = (value) => {
   if (!value) return "";
 
@@ -71,6 +78,7 @@ const toDateInputValue = (value) => {
   return "";
 };
 
+// 날짜/시간을 한 번에 받아 날짜와 시간으로 분리한 객체 반환
 const splitDateAndTime = (value) => {
   const date = toDateInputValue(value);
   const time = toTimeInputValue(value);
@@ -84,6 +92,7 @@ export default function TodayPlanDetailComponent({
   plannerStartday,
   plannerEndday,
 }) {
+  // 초기 렌더링 시 기존 일정 값을 input-friendly 값으로 분리
   const initialStart = splitDateAndTime(place.startAtDateTime ?? place.startAt);
   const initialEnd = splitDateAndTime(place.endAtDateTime ?? place.endAt);
 
@@ -102,9 +111,10 @@ export default function TodayPlanDetailComponent({
     place.budgetAmount ?? ""
   );
   const [memo, setMemo] = useState(place.memo || "");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false); // 저장 진행 상태
 
   useEffect(() => {
+    // 선택된 place가 바뀌면 입력폼을 최신 값으로 동기화
     setPlaceName(place.title || place.placeName || "");
     const nextStart = splitDateAndTime(place.startAtDateTime ?? place.startAt);
     const nextEnd = splitDateAndTime(place.endAtDateTime ?? place.endAt);
@@ -120,6 +130,7 @@ export default function TodayPlanDetailComponent({
     setMemo(place.memo || "");
   }, [place, plannerStartday, plannerEndday]);
 
+  // 검증 후 상위 onSave 콜백으로 TodayPlan 업데이트 요청
   const handleSave = async () => {
     if (!placeName.trim()) {
       alert("장소명을 입력하세요.");
