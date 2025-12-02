@@ -125,6 +125,59 @@ const normalizeNumeric = (value) => {
   return numeric;
 };
 
+const toTimeWithSeconds = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    if (/^\d{2}:\d{2}$/.test(value)) {
+      return `${value}:00`;
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(11, 19);
+    }
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(11, 19);
+  }
+
+  return null;
+};
+
+const extractDatePart = (value) => {
+  if (!value) return null;
+
+  if (typeof value === "string") {
+    const match = value.match(/^\d{4}-\d{2}-\d{2}/);
+    if (match) {
+      return match[0];
+    }
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return null;
+};
+
 const normalizePlan = (plan, fallbackPlannerNo) => {
   if (!plan) {
     return null;
@@ -142,6 +195,39 @@ const normalizePlan = (plan, fallbackPlannerNo) => {
     plan.firstimage ||
     null;
 
+  const startDate =
+    extractDatePart(plan.startAt) ??
+    extractDatePart(plan.todayPlanDate) ??
+    extractDatePart(plan.planDate) ??
+    extractDatePart(plan.todayDate) ??
+    extractDatePart(plan.travelDate) ??
+    null;
+
+  const endDate =
+    extractDatePart(plan.endAt) ??
+    extractDatePart(plan.todayPlanDate) ??
+    extractDatePart(plan.planDate) ??
+    extractDatePart(plan.todayDate) ??
+    extractDatePart(plan.travelDate) ??
+    null;
+
+  const startTime = normalizeTimeForDisplay(plan.startAt);
+  const endTime = normalizeTimeForDisplay(plan.endAt);
+
+  const startAtDateTime =
+    startDate && startTime
+      ? `${startDate}T${toTimeWithSeconds(startTime)}`
+      : typeof plan.startAt === "string"
+        ? plan.startAt
+        : null;
+
+  const endAtDateTime =
+    endDate && endTime
+      ? `${endDate}T${toTimeWithSeconds(endTime)}`
+      : typeof plan.endAt === "string"
+        ? plan.endAt
+        : null;
+
   return {
     ...plan,
     id: resolvedId,
@@ -154,8 +240,12 @@ const normalizePlan = (plan, fallbackPlannerNo) => {
     address: addressText,
     imageUrl: imageUrl,
     image: imageUrl ?? plan.image ?? null,
-    startAt: normalizeTimeForDisplay(plan.startAt),
-    endAt: normalizeTimeForDisplay(plan.endAt),
+    startAt: startTime,
+    endAt: endTime,
+    startDate,
+    endDate,
+    startAtDateTime,
+    endAtDateTime,
     budgetAmount: normalizeNumeric(plan.budgetAmount),
     memo: plan.memo ?? "",
   };
@@ -214,33 +304,6 @@ const isSameIdentifier = (plan, identifier) => {
     return false;
   }
   return String(planId) === String(identifier);
-};
-
-const toTimeWithSeconds = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  if (typeof value === "string") {
-    if (/^\d{2}:\d{2}$/.test(value)) {
-      return `${value}:00`;
-    }
-
-    if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
-      return value;
-    }
-
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(11, 19);
-    }
-  }
-
-  if (value instanceof Date) {
-    return value.toISOString().slice(11, 19);
-  }
-
-  return null;
 };
 
 const normalizeCoordinate = (value) => {
@@ -502,6 +565,8 @@ const MainA = () => {
     placeName,
     startAt,
     endAt,
+    startDate,
+    endDate,
     budgetAmount,
     memo,
   }) => {
@@ -519,9 +584,13 @@ const MainA = () => {
 
   // 1) 시간 부분을 HH:mm:ss 로 정규화
   const sanitizedStartTime =
-    toTimeWithSeconds(startAt) ?? toTimeWithSeconds(selectedPlan.startAt);
+    toTimeWithSeconds(startAt) ??
+    toTimeWithSeconds(selectedPlan.startAtDateTime) ??
+    toTimeWithSeconds(selectedPlan.startAt);
   const sanitizedEndTime =
-    toTimeWithSeconds(endAt) ?? toTimeWithSeconds(selectedPlan.endAt);
+    toTimeWithSeconds(endAt) ??
+    toTimeWithSeconds(selectedPlan.endAtDateTime) ??
+    toTimeWithSeconds(selectedPlan.endAt);
 
   if (!sanitizedStartTime || !sanitizedEndTime) {
     alert("시작 시간과 종료 시간을 올바르게 입력해주세요.");
@@ -529,44 +598,36 @@ const MainA = () => {
   }
 
   // 2) 날짜 부분(todayPlanDate 등)에서 yyyy-MM-dd 추출
-  const rawDateValue =
-    selectedPlan.todayPlanDate ??
-    selectedPlan.planDate ??
-    selectedPlan.todayDate ??
-    selectedPlan.travelDate ??
-    null;
+  const startDatePart =
+    startDate ??
+    extractDatePart(startAt) ??
+    selectedPlan.startDate ??
+    extractDatePart(selectedPlan.startAtDateTime) ??
+    extractDatePart(selectedPlan.todayPlanDate) ??
+    extractDatePart(selectedPlan.planDate) ??
+    extractDatePart(selectedPlan.todayDate) ??
+    extractDatePart(selectedPlan.travelDate) ??
+    new Date().toISOString().slice(0, 10);
 
-  const extractDatePart = (value) => {
-    if (!value) return null;
-
-    // 문자열인 경우
-    if (typeof value === "string") {
-      // "2025-11-19T00:00:00" 같이 T가 있으면 앞부분만
-      if (value.includes("T")) {
-        return value.split("T")[0];
-      }
-      // "2025-11-19" 형태라고 가정
-      return value.slice(0, 10);
-    }
-
-    // Date 객체인 경우
-    if (value instanceof Date) {
-      return value.toISOString().slice(0, 10); // yyyy-MM-dd
-    }
-
-    return null;
-  };
-
-  let datePart = extractDatePart(rawDateValue);
-
-  // 만약 날짜가 전혀 없다면, 오늘 날짜로 fallback
-  if (!datePart) {
-    datePart = new Date().toISOString().slice(0, 10); // yyyy-MM-dd
-  }
+  const endDatePart =
+    endDate ??
+    extractDatePart(endAt) ??
+    selectedPlan.endDate ??
+    extractDatePart(selectedPlan.endAtDateTime) ??
+    extractDatePart(selectedPlan.todayPlanDate) ??
+    extractDatePart(selectedPlan.planDate) ??
+    extractDatePart(selectedPlan.todayDate) ??
+    extractDatePart(selectedPlan.travelDate) ??
+    new Date().toISOString().slice(0, 10);
 
   // 3) LocalDateTime 형식으로 합치기: yyyy-MM-ddTHH:mm:ss
-  const startDateTime = `${datePart}T${sanitizedStartTime}`;
-  const endDateTime = `${datePart}T${sanitizedEndTime}`;
+  const startDateTime = `${startDatePart}T${sanitizedStartTime}`;
+  const endDateTime = `${endDatePart}T${sanitizedEndTime}`;
+
+  if (new Date(startDateTime) >= new Date(endDateTime)) {
+    alert("종료 시간은 시작 시간 이후여야 합니다.");
+    return;
+  }
 
   const numericBudget = normalizeNumeric(budgetAmount);
   const resolvedBudget =
@@ -601,7 +662,8 @@ const MainA = () => {
 
     }
     else console.log("no numericTodayNo");
-    return fetchNextTodayNo(numericPlannerNo);
+    //return fetchNextTodayNo(numericPlannerNo);
+    return 6;
 
   })();
 
@@ -673,6 +735,8 @@ const MainA = () => {
         ...selectedPlan,
         ...responseData,
         plannerNo: numericPlannerNo,
+        startDate: startDatePart,
+        endDate: endDatePart,
         todayPlanNo:
           responseData?.todayPlanNo ??
           responseData?.todayPlanId ??
@@ -687,6 +751,8 @@ const MainA = () => {
         // 여기에는 LocalDateTime을 넣지만, normalizePlan에서 화면용 HH:mm로 다시 잘라줄 것
         startAt: startDateTime,
         endAt: endDateTime,
+        startAtDateTime: startDateTime,
+        endAtDateTime: endDateTime,
         budgetAmount:
           resolvedBudget ?? normalizeNumeric(selectedPlan.budgetAmount) ?? null,
         memo: resolvedMemo,
@@ -831,6 +897,12 @@ const MainA = () => {
             onTitleChange={setPlannerTitle}
             todayPlans={todayPlans}
             plannerNo={currentPlanner?.plannerNo}
+            plannerStartday={
+              currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday
+            }
+            plannerEndday={
+              currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday
+            }
             onSelectPlan={handleSelectSidebarItem}
             selectedPlanId={selectedPlanId}
             onRemove={handleRemovePlan}
@@ -908,6 +980,12 @@ const MainA = () => {
                   place={selectedPlan}
                   onSave={handleSaveTodayPlan}
                   onCancel={handleCancelDetail}
+                  plannerStartday={
+                    currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday ?? null
+                  }
+                  plannerEndday={
+                    currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday ?? null
+                  }
                 />
               ) : (
                 <Paper

@@ -50,10 +50,54 @@ const sanitizeTimeInput = (value) => {
   return "";
 };
 
-export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
+const toDateInputValue = (value) => {
+  if (!value) return "";
+
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      return value.slice(0, 10);
+    }
+
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().slice(0, 10);
+    }
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return "";
+};
+
+const splitDateAndTime = (value) => {
+  const date = toDateInputValue(value);
+  const time = toTimeInputValue(value);
+  return { date, time };
+};
+
+export default function TodayPlanDetailComponent({
+  place,
+  onSave,
+  onCancel,
+  plannerStartday,
+  plannerEndday,
+}) {
+  const initialStart = splitDateAndTime(place.startAtDateTime ?? place.startAt);
+  const initialEnd = splitDateAndTime(place.endAtDateTime ?? place.endAt);
+
+  const fallbackStartDate =
+    place.startDate || place.todayPlanDate || plannerStartday || "";
+  const fallbackEndDate = place.endDate || place.todayPlanDate || plannerEndday || "";
+
   const [placeName, setPlaceName] = useState(place.title || place.placeName || "");
-  const [startAt, setStartAt] = useState(toTimeInputValue(place.startAt));
-  const [endAt, setEndAt] = useState(toTimeInputValue(place.endAt));
+  const [startDate, setStartDate] = useState(
+    initialStart.date || fallbackStartDate
+  );
+  const [endDate, setEndDate] = useState(initialEnd.date || fallbackEndDate);
+  const [startAt, setStartAt] = useState(initialStart.time);
+  const [endAt, setEndAt] = useState(initialEnd.time);
   const [budgetAmount, setBudgetAmount] = useState(
     place.budgetAmount ?? ""
   );
@@ -62,49 +106,42 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
 
   useEffect(() => {
     setPlaceName(place.title || place.placeName || "");
-    setStartAt(toTimeInputValue(place.startAt));
-    setEndAt(toTimeInputValue(place.endAt));
+    const nextStart = splitDateAndTime(place.startAtDateTime ?? place.startAt);
+    const nextEnd = splitDateAndTime(place.endAtDateTime ?? place.endAt);
+    setStartDate(nextStart.date || place.startDate || place.todayPlanDate || plannerStartday || "");
+    setEndDate(nextEnd.date || place.endDate || place.todayPlanDate || plannerEndday || "");
+    setStartAt(nextStart.time);
+    setEndAt(nextEnd.time);
     setBudgetAmount(
       place.budgetAmount === null || place.budgetAmount === undefined
         ? ""
         : place.budgetAmount
     );
     setMemo(place.memo || "");
-  }, [place]);
-
-  const parseToDate = (value) => {
-    if (!value) return null;
-    if (/^\d{2}:\d{2}$/.test(value)) {
-      const [hours, minutes] = value.split(":").map(Number);
-      const date = new Date();
-      date.setHours(hours, minutes, 0, 0);
-      return date;
-    }
-
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) {
-      return null;
-    }
-    return parsed;
-  };
+  }, [place, plannerStartday, plannerEndday]);
 
   const handleSave = async () => {
     if (!placeName.trim()) {
       alert("장소명을 입력하세요.");
       return;
     }
-    if (!startAt || !endAt) {
-      alert("시작/종료 시간을 입력하세요.");
+    if (!startDate || !endDate || !startAt || !endAt) {
+      alert("시작/종료 날짜와 시간을 모두 입력하세요.");
       return;
     }
 
     const sanitizedStart = sanitizeTimeInput(startAt);
     const sanitizedEnd = sanitizeTimeInput(endAt);
 
-    const startDate = parseToDate(sanitizedStart);
-    const endDate = parseToDate(sanitizedEnd);
+    if (!sanitizedStart || !sanitizedEnd) {
+      alert("시작/종료 시간을 올바르게 입력하세요.");
+      return;
+    }
 
-    if (startDate && endDate && startDate >= endDate) {
+    const startDateTime = `${startDate}T${sanitizedStart.length === 5 ? `${sanitizedStart}:00` : sanitizedStart}`;
+    const endDateTime = `${endDate}T${sanitizedEnd.length === 5 ? `${sanitizedEnd}:00` : sanitizedEnd}`;
+
+    if (new Date(startDateTime) >= new Date(endDateTime)) {
       alert("종료 시간은 시작 시간 이후여야 합니다.");
       return;
     }
@@ -120,8 +157,10 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
       await onSave({
         plannerNo: place.plannerNo ?? null,
         placeName: placeName.trim(),
-        startAt: sanitizedStart,
-        endAt: sanitizedEnd,
+        startAt: startDateTime,
+        endAt: endDateTime,
+        startDate,
+        endDate,
         budgetAmount:
           budgetAmount === "" || Number.isNaN(numericBudget)
             ? null
@@ -142,24 +181,46 @@ export default function TodayPlanDetailComponent({ place, onSave, onCancel }) {
         {place.title || placeName || "선택된 일정"}
       </h3>
       {place.imageUrl && (
-  <img
-    src={place.imageUrl}
-    alt={placeName || place.title}
-    width={300}
-    height={200}
-    className="rounded-md mb-3 object-cover"
-  />
-)}
+        <img
+          src={place.imageUrl}
+          alt={placeName || place.title}
+          width={300}
+          height={200}
+          className="rounded-md mb-3 object-cover"
+        />
+      )}
 
       {place.addr && <p className="text-sm mb-3">{place.addr}</p>}
 
       <div className="space-y-2 text-sm">
+        <div className="flex items-center justify-between gap-2">
+          <label className="mr-2">시작 날짜</label>
+          <input
+            type="date"
+            value={startDate}
+            min={plannerStartday || undefined}
+            max={plannerEndday || undefined}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="flex-1 rounded-md px-2 py-1"
+          />
+        </div>
         <div className="flex items-center justify-between gap-2">
           <label className="mr-2">시작 시간</label>
           <input
             type="time"
             value={startAt}
             onChange={(e) => setStartAt(e.target.value)}
+            className="flex-1 rounded-md px-2 py-1"
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <label className="mr-2">종료 날짜</label>
+          <input
+            type="date"
+            value={endDate}
+            min={plannerStartday || undefined}
+            max={plannerEndday || undefined}
+            onChange={(e) => setEndDate(e.target.value)}
             className="flex-1 rounded-md px-2 py-1"
           />
         </div>
