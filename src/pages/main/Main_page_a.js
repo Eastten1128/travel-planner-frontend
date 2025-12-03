@@ -93,6 +93,19 @@ const ensurePlanId = (plan) => {
   return candidate !== undefined && candidate !== null ? candidate : null;
 };
 
+// 두 자리로 고정된 숫자 문자열 생성
+const pad2 = (value) => String(value).padStart(2, "0");
+
+// Date 객체를 로컬 기준 YYYY-MM-DD 문자열로 변환 (타임존 변환 방지)
+const formatLocalDate = (date) =>
+  `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+
+// Date 객체를 로컬 기준 HH:mm:ss 문자열로 변환 (타임존 변환 방지)
+const formatLocalTime = (date) =>
+  `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+
+
+
 // Date/문자열 시간을 HH:mm 형태로 정리해 화면 표시용으로 사용
 const normalizeTimeForDisplay = (value) => {
   if (!value) {
@@ -100,11 +113,12 @@ const normalizeTimeForDisplay = (value) => {
   }
 
   if (typeof value === "string") {
-    if (value.includes("T")) {
-      const date = new Date(value);
-      if (!Number.isNaN(date.getTime())) {
-        return date.toISOString().slice(11, 16);
-      }
+      const timeMatch =
+      value.match(/T(\d{2}:\d{2}(?::\d{2})?)/) ||
+      value.match(/\s(\d{2}:\d{2}(?::\d{2})?)/);
+
+    if (timeMatch) {
+      return timeMatch[1].slice(0, 5);
     }
 
     if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
@@ -117,7 +131,7 @@ const normalizeTimeForDisplay = (value) => {
   }
 
   if (value instanceof Date) {
-    return value.toISOString().slice(11, 16);
+    return formatLocalTime(value).slice(0, 5);
   }
 
   return "";
@@ -141,6 +155,17 @@ const toTimeWithSeconds = (value) => {
   }
 
   if (typeof value === "string") {
+    const timeMatch =
+      value.match(/T(\d{2}:\d{2}(?::\d{2})?)/) ||
+      value.match(/\s(\d{2}:\d{2}(?::\d{2})?)/);
+
+    if (timeMatch) {
+      const timePart = timeMatch[1];
+      return /^\d{2}:\d{2}:\d{2}$/.test(timePart)
+        ? timePart
+        : `${timePart.slice(0, 5)}:00`;
+    }
+
     if (/^\d{2}:\d{2}$/.test(value)) {
       return `${value}:00`;
     }
@@ -148,15 +173,10 @@ const toTimeWithSeconds = (value) => {
     if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
       return value;
     }
-
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(11, 19);
-    }
   }
 
   if (value instanceof Date) {
-    return value.toISOString().slice(11, 19);
+    return formatLocalTime(value);
   }
 
   return null;
@@ -170,19 +190,18 @@ const extractDatePart = (value) => {
     if (match) {
       return match[0];
     }
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(0, 10);
+    if (value.includes("T")) {
+      return value.split("T")[0];
     }
   }
 
   if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
+    return formatLocalDate(value);
   }
 
   const parsed = new Date(value);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString().slice(0, 10);
+    return formatLocalDate(parsed);
   }
 
   return null;
@@ -597,7 +616,7 @@ const MainA = () => {
   }
 
   const resolvedPlannerNo =
-    plannerNo ?? currentPlanner?.plannerNo ?? selectedPlan.plannerNo;
+    plannerNo ?? currentPlanner?.plannerNo ?? selectedPlan?.plannerNo;
 
   if (!resolvedPlannerNo) {
     alert("먼저 플래너를 저장하거나 선택해주세요.");
@@ -629,7 +648,7 @@ const MainA = () => {
     extractDatePart(selectedPlan.planDate) ??
     extractDatePart(selectedPlan.todayDate) ??
     extractDatePart(selectedPlan.travelDate) ??
-    new Date().toISOString().slice(0, 10);
+    formatLocalDate(new Date());
 
   const endDatePart =
     endDate ??
@@ -640,9 +659,11 @@ const MainA = () => {
     extractDatePart(selectedPlan.planDate) ??
     extractDatePart(selectedPlan.todayDate) ??
     extractDatePart(selectedPlan.travelDate) ??
-    new Date().toISOString().slice(0, 10);
+    formatLocalDate(new Date());
 
   // 3) LocalDateTime 형식으로 합치기: yyyy-MM-ddTHH:mm:ss
+  // 로컬 시간 문자열을 그대로 서버에 전달하여 타임존 꼬임을 방지
+
   const startDateTime = `${startDatePart}T${sanitizedStartTime}`;
   const endDateTime = `${endDatePart}T${sanitizedEndTime}`;
 
@@ -678,14 +699,27 @@ const MainA = () => {
     if (todaySequence !== null && todaySequence !== undefined) {
       const numericTodayNo = Number(todaySequence);
       console.log(todaySequence);
-      if(!Number.isNaN(numericTodayNo) && numericTodayNo> 0){
+      if (!Number.isNaN(numericTodayNo) && numericTodayNo > 0){
         return numericTodayNo;
       }
-
     }
-    else console.log("no numericTodayNo");
-    //return fetchNextTodayNo(numericPlannerNo);
-    return 6;
+    const existingNos = (todayPlans ?? [])
+      .filter((plan) => Number(plan?.plannerNo) === numericPlannerNo)
+      .map((plan) =>
+        Number(
+          plan?.todayNo ??
+            plan?.sequence ??
+            plan?.order ??
+            plan?.orderNo ??
+            0
+        )
+      )
+      .filter((no) => !Number.isNaN(no) && no > 0);
+
+    const maxNo = existingNos.length > 0 ? Math.max(...existingNos) : 0;
+    console.log("maxNo:", maxNo);
+    return maxNo + 1;
+    
 
   })();
 

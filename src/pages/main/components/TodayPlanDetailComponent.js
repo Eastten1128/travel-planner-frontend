@@ -4,6 +4,8 @@
  */
 import React, { useEffect, useState } from "react";
 
+const pad2 = (num) => String(num).padStart(2, "0");
+
 // Date/시간 값을 <input type="time">에서 사용할 수 있는 HH:mm 문자열로 변환
 const toTimeInputValue = (value) => {
   if (!value) {
@@ -11,11 +13,12 @@ const toTimeInputValue = (value) => {
   }
 
   if (typeof value === "string") {
-    if (value.includes("T")) {
-      const date = new Date(value);
-      if (!Number.isNaN(date.getTime())) {
-        return date.toISOString().slice(11, 16);
-      }
+    const timeMatch =
+      value.match(/T(\d{2}:\d{2}(?::\d{2})?)/) ||
+      value.match(/\s(\d{2}:\d{2}(?::\d{2})?)/);
+
+    if (timeMatch) {
+      return timeMatch[1].slice(0, 5);
     }
 
     if (/^\d{2}:\d{2}:\d{2}$/.test(value)) {
@@ -28,7 +31,7 @@ const toTimeInputValue = (value) => {
   }
 
   if (value instanceof Date) {
-    return value.toISOString().slice(11, 16);
+      return `${pad2(value.getHours())}:${pad2(value.getMinutes())}`;
   }
 
   return "";
@@ -48,11 +51,6 @@ const sanitizeTimeInput = (value) => {
     return value.slice(0, 5);
   }
 
-  const date = new Date(value);
-  if (!Number.isNaN(date.getTime())) {
-    return date.toISOString().slice(11, 16);
-  }
-
   return "";
 };
 
@@ -65,14 +63,14 @@ const toDateInputValue = (value) => {
       return value.slice(0, 10);
     }
 
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(0, 10);
+    if (value.includes("T")) {
+      return value.split("T")[0];
     }
   }
 
   if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
+    return `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(value.getDate())}`;
+
   }
 
   return "";
