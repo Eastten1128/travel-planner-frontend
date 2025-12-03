@@ -357,25 +357,27 @@ const MainA = () => {
   const [openModal, setOpenModal] = useState(false); // 추가 정보 입력 모달 표시 여부
   const [plannerTitle, setPlannerTitle] = useState(""); // 현재 선택된 플래너 제목
   const [todayPlans, setTodayPlans] = useState([]); // 임시+저장된 TodayPlan 목록
+  const [todayPlansLoaded, setTodayPlansLoaded] = useState(false); // 현재 플래너의 TodayPlan이 서버에서 로드되었는지 여부
   const [currentPlanner, setCurrentPlanner] = useState(null); // 선택된 플래너 정보
   const [selectedPlan, setSelectedPlan] = useState(null); // 상세 패널에 표시 중인 일정
   const [detailOpen, setDetailOpen] = useState(false); // 상세 패널 표시 여부
   const [currentUserId, setCurrentUserId] = useState(null); // 로그인한 사용자 ID
   const {plannerNo} = useParams();
-
-
-    // 현재 플래너의 today_no 최대값을 조회하여 다음 순번 계산
-    const fetchNextTodayNo = useCallback(
+  // 현재 플래너에 저장된 TodayPlan 목록을 서버에서 가져와 상태에 반영한다.
+  // 새로고침 후 todayPlans가 비어있는 상태에서 todayNo가 1로 초기화되는 문제를 방지하기 위함.
+  const refreshTodayPlans = useCallback(
     async (plannerNoForQuery) => {
-      if (plannerNoForQuery === undefined || plannerNoForQuery === null) {
-        return 1;
+      const numericPlannerNo = Number(plannerNoForQuery);
+      if (Number.isNaN(numericPlannerNo)) {
+        setTodayPlans([]);
+        setTodayPlansLoaded(true);
+        return;
       }
 
+      setTodayPlansLoaded(false);
+
       try {
-        const response = await getTodayPlansByPlanner(
-          plannerNoForQuery,
-          currentUserId ?? undefined
-        );
+        const response = await getTodayPlansByPlanner(numericPlannerNo);
 
         const planList = (() => {
           if (Array.isArray(response)) return response;
@@ -386,32 +388,91 @@ const MainA = () => {
           return [];
         })();
 
-        if (!planList.length) {
-          return 1;
-        }
+        const normalized = planList
+          .map((plan) =>
+            normalizePlan(
+              {
+                ...plan,
+                plannerNo: plan?.plannerNo ?? numericPlannerNo,
+                __source: "saved",
+              },
+              numericPlannerNo
+            )
+          )
+          .filter(Boolean);
 
-        const maxTodayNo = planList.reduce((maxValue, plan) => {
-          const rawTodayNo =
-            plan?.todayNo ??
-            plan?.sequence ??
-            plan?.order ??
-            plan?.orderNo ??
-            null;
-          const numericTodayNo = Number(rawTodayNo);
-          if (Number.isNaN(numericTodayNo)) {
-            return maxValue;
-          }
+        setTodayPlans((prev) => {
+          const draftForPlanner = prev.filter((plan) => {
+            const planPlannerNo = Number(plan?.plannerNo);
+            const isDraft = !plan?.todayPlanNo && !plan?.todayPlanId;
+            return (
+              !Number.isNaN(planPlannerNo) &&
+              planPlannerNo === numericPlannerNo &&
+              isDraft
+            );
+          });
 
-          return Math.max(maxValue, numericTodayNo);
-        }, 0);
+          const merged = [...normalized, ...draftForPlanner];
+          const seen = new Set();
 
-        return maxTodayNo > 0 ? maxTodayNo + 1 : 1;
+          return merged.filter((plan) => {
+            const identifier = getPlanIdentifier(plan);
+            if (identifier === null) {
+              return true;
+            }
+            if (seen.has(String(identifier))) {
+              return false;
+            }
+            seen.add(String(identifier));
+            return true;
+          });
+        });
       } catch (error) {
-        console.error("다음 today_no 계산 실패:", error);
-        return 1;
+        console.error("오늘의 일정 목록 로드 실패:", error);
+      } finally {
+        setTodayPlansLoaded(true);
       }
     },
-    [currentUserId]
+    []
+  );
+
+  // 현재 선택된 플래너 todayNo 최대값 + 1을 항상 최신 todayPlans 기준으로 계산한다.
+  const resolveNextTodayNo = useCallback(
+    (plannerNoForQuery) => {
+      const numericPlannerNo = Number(
+        plannerNoForQuery ?? currentPlanner?.plannerNo ?? selectedPlan?.plannerNo
+      );
+
+      if (Number.isNaN(numericPlannerNo)) {
+        return 1;
+      }
+
+      if (!todayPlansLoaded && (todayPlans ?? []).length === 0) {
+        return 1;
+      }
+
+      const existingNos = (todayPlans ?? [])
+        .filter((plan) => Number(plan?.plannerNo) === numericPlannerNo)
+        .map((plan) =>
+          Number(
+            plan?.todayNo ??
+              plan?.sequence ??
+              plan?.order ??
+              plan?.orderNo ??
+              0
+          )
+        )
+        .filter((no) => !Number.isNaN(no) && no > 0);
+
+      const maxNo = existingNos.length > 0 ? Math.max(...existingNos) : 0;
+      return maxNo + 1;
+    },
+    [
+      currentPlanner?.plannerNo,
+      selectedPlan?.plannerNo,
+      todayPlans,
+      todayPlansLoaded,
+    ]
   );
 
 
@@ -421,18 +482,19 @@ const MainA = () => {
     async (userId, targetPlannerNo) => {
       try {
         const plannerResponse = await getMyPlanners(
-        userId !== undefined && userId !== null ? { userId } : undefined
-      );
-      const planners = extractPlannerList(plannerResponse);
+          userId !== undefined && userId !== null ? { userId } : undefined
+        );
+        const planners = extractPlannerList(plannerResponse);
 
-      if (!planners.length) {
-        setCurrentPlanner(null);
-        setPlannerTitle("");
-        setTodayPlans([]);
-        setSelectedPlan(null);
-        setDetailOpen(false);
-        return;
-      }
+        if (!planners.length) {
+          setCurrentPlanner(null);
+          setPlannerTitle("");
+          setTodayPlans([]);
+          setTodayPlansLoaded(true);
+          setSelectedPlan(null);
+          setDetailOpen(false);
+          return;
+        }
 
       // 🔥 URL에서 온 plannerNo와 일치하는 플래너 찾기
       let selectedPlanner = planners[0]; // 기본값: 첫 번째
@@ -456,6 +518,11 @@ const MainA = () => {
       const normalizedPlans = normalizePlannerPlans(selectedPlanner);
       setTodayPlans(normalizedPlans);
 
+      // 새로고침 시점에도 서버에 저장된 todayPlans를 다시 불러와 todayNo 계산의 기준을 DB 상태로 맞춘다.
+      await refreshTodayPlans(
+        selectedPlanner?.plannerNo ?? selectedPlanner?.id ?? null
+      );
+
       if (normalizedPlans.length > 0) {
         setSelectedPlan(normalizedPlans[0]);
         setDetailOpen(true);
@@ -467,7 +534,7 @@ const MainA = () => {
       console.error("플래너 정보를 불러오지 못했습니다:", error);
     }
   },
-  []
+  [refreshTodayPlans]
 );
 
   useEffect(() => {
@@ -531,23 +598,26 @@ const MainA = () => {
       },
       currentPlanner?.plannerNo ?? null
     );
+    const decoratedPlan = enrichedPlan
+      ? { ...enrichedPlan, __source: plan.__source ?? "draft" }
+      : enrichedPlan;
     //**************************씨부레 8이 나온?
     console.log(enrichedPlan);
 
 
 
-    if (!enrichedPlan) {
+    if (!decoratedPlan) {
       return;
     }
 
     setTodayPlans((prev) => {
-      const planId = getPlanIdentifier(enrichedPlan);
+      const planId = getPlanIdentifier(decoratedPlan);
       if (planId !== null && prev.some((item) => isSameIdentifier(item, planId))) {
         return prev;
       }
-      return [...prev, enrichedPlan];
+      return [...prev, decoratedPlan];
     });
-    setSelectedPlan(enrichedPlan);
+    setSelectedPlan(decoratedPlan);
     setDetailOpen(true);
   };
 
@@ -693,34 +763,20 @@ const MainA = () => {
     selectedPlan.orderNo ??
     null;
 
-
-    //수정********************************************************return값을 +1씩 증가시켜야해요.
+  // 현재 선택된 플래너의 todayPlans를 기반으로 todayNo 최대값 + 1을 계산한다.
   const resolvedTodayNo = (() => {
     if (todaySequence !== null && todaySequence !== undefined) {
       const numericTodayNo = Number(todaySequence);
       console.log(todaySequence);
-      if (!Number.isNaN(numericTodayNo) && numericTodayNo > 0){
+      if (!Number.isNaN(numericTodayNo) && numericTodayNo > 0) {
         return numericTodayNo;
       }
     }
-    const existingNos = (todayPlans ?? [])
-      .filter((plan) => Number(plan?.plannerNo) === numericPlannerNo)
-      .map((plan) =>
-        Number(
-          plan?.todayNo ??
-            plan?.sequence ??
-            plan?.order ??
-            plan?.orderNo ??
-            0
-        )
-      )
-      .filter((no) => !Number.isNaN(no) && no > 0);
 
-    const maxNo = existingNos.length > 0 ? Math.max(...existingNos) : 0;
-    console.log("maxNo:", maxNo);
-    return maxNo + 1;
-    
-
+    // todayPlansLoaded가 false이더라도 resolveNextTodayNo는 로컬에 저장된 최신 값(서버에서 갱신된 todayPlans)을 기준으로 계산한다.
+    const nextNo = resolveNextTodayNo(numericPlannerNo);
+    console.log("maxNo 기반 계산된 todayNo:", nextNo);
+    return nextNo;
   })();
 
 
