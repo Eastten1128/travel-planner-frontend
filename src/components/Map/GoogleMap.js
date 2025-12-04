@@ -19,7 +19,7 @@ const GoogleMap = ({
       width={width}
       height={height}
       frameBorder="0"
-      className="h-full w-full rounded-2xl shadow-sm"
+      className="h-full w-full border-0"
       referrerPolicy="no-referrer-when-downgrade"
       src={src}
       allowFullScreen

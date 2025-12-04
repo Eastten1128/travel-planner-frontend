@@ -357,7 +357,7 @@ const PlannerSidebar = ({
   };
 
   return (
-    <aside className="w-full max-w-[320px] shrink-0 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100 lg:max-w-[340px] xl:max-w-[360px]">
+    <aside className="flex h-full min-h-[360px] flex-col rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
       <div className="flex items-center gap-3">
         <div className="flex-1">
           <label className="text-xs font-semibold text-gray-500">플래너 제목</label>
@@ -378,7 +378,7 @@ const PlannerSidebar = ({
 
       <div className="my-4 h-px w-full bg-gray-100" />
 
-      <div className="flex flex-col gap-3 overflow-y-auto pr-2" style={{ maxHeight: "70vh" }}>
+      <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto pr-2">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-900">오늘의 일정</p>
           <span className="text-xs font-medium text-emerald-600">{normalizedPlans.length}개</span>
