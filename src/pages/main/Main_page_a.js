@@ -8,16 +8,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Container,
-  Typography,
-  Box,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
   Button,
-  Paper,
 } from "@mui/material";
 import Navbar from "../../components/Navbar/afterLogin/Navbar_a";
 import Footer from "../../components/Footer/Footer";
@@ -990,142 +986,79 @@ const MainA = () => {
     [selectedPlan]
   );
 
-  // 페이지 레이아웃: 좌측 사이드바 + 우측 검색/지도/상세 정보 영역
+  // 페이지 레이아웃: 좌측 3(사이드바/검색) : 우측 7(지도/상세) 비율의 전체 화면 구성
   return (
     <>
       <Navbar />
-      <Container maxWidth={false} sx={{ px: { xs: 2, md: 3 }, py: 4 }}>
-        <Box
-          sx={{
-            display: "flex",
-            gap: { xs: 3, lg: 4 },
-            alignItems: "stretch",
-            justifyContent: "flex-start",
-            width: "100%",
-            maxWidth: "1600px",
-            mx: "auto",
-          }}
-        >
-          <PlannerSidebar
-            plannerTitle={plannerTitle}
-            onTitleChange={setPlannerTitle}
-            todayPlans={todayPlans}
-            plannerNo={currentPlanner?.plannerNo}
-            plannerStartday={
-              currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday
-            }
-            plannerEndday={
-              currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday
-            }
-            onSelectPlan={handleSelectSidebarItem}
-            selectedPlanId={selectedPlanId}
-            onRemove={handleRemovePlan}
-            onSave={handleSavePlanner}
-          />
-          <Box
-            sx={{
-              flex: 1.2,
-              display: "flex",
-              flexDirection: { xs: "column", lg: "row" },
-              gap: { xs: 3, lg: 4 },
-              alignItems: "stretch",
-              minHeight: 520,
-              width: "100%",
-            }}
-          >
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 3,
-                alignItems: "stretch",
-                width: { xs: "100%", lg: 380 },
-                flexShrink: 0,
-              }}
-            >
-              <Box sx={{ maxWidth: 380, width: "100%" }}>
-                <SearchComponent onAddPlan={handleAddPlan} />
-              </Box>
-              <Paper
-                sx={{
-                  p: { xs: 3, md: 4 },
-                  width: "100%",
-                  height: "100%",
-                  minHeight: { xs: 520, md: 620 },
-                  borderRadius: 4,
-                  boxShadow: "0 22px 50px rgba(0, 0, 0, 0.14)",
-                  background: "linear-gradient(180deg, #ffffff 0%, #f5f7fb 100%)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2.5,
-                }}
-                elevation={3}
-              >
-                <Typography
-                  variant="h4"
-                  sx={{
-                    fontWeight: 800,
-                    letterSpacing: "-0.02em",
-                    textAlign: "left",
-                  }}
-                >
-                  지도
-                </Typography>
-                <Box sx={{ flex: 1, minHeight: { xs: 440, md: 520 } }}>
-                  <GoogleMap
-                    query={
-                      selectedPlan?.placeName || selectedPlan?.title || "Seoul"
-                    }
-                    height="100%"
-                  />
-                </Box>
-              </Paper>
-              </Box>
-            <Box
-              sx={{
-                position: { lg: "sticky" },
-                top: { lg: 20 },
-                alignSelf: "flex-start",
-                width: "100%",
-              }}
-            >
-              {detailOpen && selectedPlan ? (
-                <TodayPlanDetailComponent
-                  place={selectedPlan}
-                  onSave={handleSaveTodayPlan}
-                  onCancel={handleCancelDetail}
+      <main className="flex min-h-screen flex-col bg-gray-100">
+        <div className="flex flex-1 flex-col gap-4 px-4 py-6 lg:px-8">
+          <div className="flex flex-1 flex-col gap-4 lg:flex-row">
+            <div className="flex flex-col gap-4 lg:basis-[30%] lg:max-w-[32%]">
+              <div className="flex-1">
+                <PlannerSidebar
+                  plannerTitle={plannerTitle}
+                  onTitleChange={setPlannerTitle}
+                  todayPlans={todayPlans}
+                  plannerNo={currentPlanner?.plannerNo}
                   plannerStartday={
-                    currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday ?? null
+                    currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday
                   }
                   plannerEndday={
-                    currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday ?? null
+                    currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday
                   }
+                  onSelectPlan={handleSelectSidebarItem}
+                  selectedPlanId={selectedPlanId}
+                  onRemove={handleRemovePlan}
+                  onSave={handleSavePlanner}
                 />
-              ) : (
-                <Paper
-                  elevation={3}
-                  sx={{
-                    width: "100%",
-                    p: 3,
-                    bgcolor: "#fff8e1",
-                    borderRadius: 3,
-                    border: "1px dashed #f2bf24",
-                  }}
-                >
-                  <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                    일정 상세 정보
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    왼쪽 플래너에서 일정을 선택하거나 검색 결과에서 일정을 추가하면
-                    상세 정보를 편집할 수 있습니다.
-                  </Typography>
-                </Paper>
-              )}
-            </Box>
-          </Box>
-        </Box>
-      </Container>
-    
+              </div>
+
+              <div className="flex-1">
+                <SearchComponent onAddPlan={handleAddPlan} />
+              </div>
+            </div>
+
+            <div className="relative flex flex-1 basis-[70%] overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 lg:p-6 lg:min-h-[560px]">
+              <div className="flex w-full flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-900">지도</h2>
+                </div>
+                <div className="relative flex-1 overflow-hidden rounded-2xl bg-gray-50 shadow-inner">
+                  <GoogleMap
+                    query={selectedPlan?.placeName || selectedPlan?.title || "Seoul"}
+                    height="100%"
+                  />
+                </div>
+              </div>
+
+              <div className="absolute right-4 top-4 z-20 w-full max-w-md">
+                {detailOpen && selectedPlan ? (
+                  <TodayPlanDetailComponent
+                    place={selectedPlan}
+                    onSave={handleSaveTodayPlan}
+                    onCancel={handleCancelDetail}
+                    plannerStartday={
+                      currentPlanner?.plannerStartday ?? currentPlanner?.planner_startday ?? null
+                    }
+                    plannerEndday={
+                      currentPlanner?.plannerEndday ?? currentPlanner?.planner_endday ?? null
+                    }
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/90 p-4 text-sm shadow-sm">
+                    <p className="text-base font-semibold text-amber-900">일정 상세 정보</p>
+                    <p className="mt-1 text-amber-700">
+                      왼쪽 플래너에서 일정을 선택하거나 검색 결과에서 일정을 추가하면 상세 정보를 편집할 수 있습니다.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <Footer />
 
       {/* ... (Dialog 관련 코드는 그대로) ... */}
       <Dialog open={openModal} onClose={() => setOpenModal(false)}>

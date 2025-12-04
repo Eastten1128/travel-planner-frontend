@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, Button, TextField, Box, Paper, List, ListItem } from "@mui/material";
+// 로그인 전 상단 네비게이션 바 컴포넌트 - 로고와 검색, 로그인 버튼을 표시
 import SignInButton from "./SignInButton";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -10,15 +10,6 @@ const Navbar = () => {
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState([]);
 
-  const handleLoginSuccess = (credentialResponse) => {
-    console.log("Google 로그인 성공:", credentialResponse);
-  };
-
-  const handleLoginFailure = () => {
-    console.log("Google 로그인 실패");
-  };
-
-  // debounce 검색 함수
   const debouncedSearch = _.debounce(async (query) => {
     if (query.trim() === "") {
       setSuggestions([]);
@@ -44,47 +35,55 @@ const Navbar = () => {
   };
 
   return (
-    <AppBar position="sticky" sx={{ backgroundColor: "#000" }}>
-      <Toolbar>
-        <Button color="inherit" onClick={() => navigate("/main_b")}>Home</Button>
-        <Button color="inherit">KADR25</Button>
+    <header className="sticky top-0 z-30 w-full border-b bg-white/90 backdrop-blur">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+            onClick={() => navigate("/main_b")}
+          >
+            Home
+          </button>
+          <span className="text-sm font-semibold text-gray-800">KADR25</span>
+        </div>
 
-        <Box position="relative" ml={2}>
-          <TextField
-            variant="outlined"
+        <div className="relative hidden flex-1 items-center justify-center px-6 sm:flex">
+          <input
+            className="w-full max-w-lg rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm outline-none transition focus:border-gray-400 focus:bg-white"
             placeholder="Search Album..."
-            size="small"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ backgroundColor: "white", borderRadius: 1, width: "300px" }}
           />
           {suggestions.length > 0 && (
-            <Paper
-              sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10 }}
-              elevation={3}
-            >
-              <List>
+            <div className="absolute left-1/2 top-12 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
+              <ul className="divide-y divide-gray-100">
                 {suggestions.map((item) => (
-                  <ListItem button key={item.id} onClick={() => handleSelect(item)}>
+                  <li
+                    key={item.id}
+                    className="cursor-pointer px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50"
+                    onClick={() => handleSelect(item)}
+                  >
                     {item.albumName} - {item.artistName}
-                  </ListItem>
+                  </li>
                 ))}
-              </List>
-            </Paper>
+              </ul>
+            </div>
           )}
-        </Box>
+        </div>
 
-        <Button
-          color="inherit"
-          sx={{ marginLeft: "20px" }}
-          onClick={() => navigate("/user/qualityReviewerAward")}
-        >
-          Quality Reviewer Award
-        </Button>
-
-        <SignInButton />
-      </Toolbar>
-    </AppBar>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100"
+            onClick={() => navigate("/user/qualityReviewerAward")}
+          >
+            Quality Reviewer Award
+          </button>
+          <SignInButton />
+        </div>
+      </div>
+    </header>
   );
 };
 

@@ -1,21 +1,6 @@
-/**
- * 플래너 상세 화면 좌측에 노출되는 사이드바 컴포넌트.
- * - 플래너 제목 수정, 저장
- * - 선택한 플래너에 속한 오늘의 일정 목록 표시 및 삭제/선택 기능을 담당한다.
- */
+// 좌측 플래너 사이드바 컴포넌트 - 제목 저장과 오늘의 일정 목록 제공
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Avatar,
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Paper,
-  Stack,
-  Divider,
-} from "@mui/material";
-import { getTodayPlansByPlanner, deleteTodayPlan} from "../../api/todayplan";
-
+import { getTodayPlansByPlanner, deleteTodayPlan } from "../../api/todayplan";
 
 const PlannerSidebar = ({
   plannerTitle = "",
@@ -29,25 +14,22 @@ const PlannerSidebar = ({
   onRemove,
   onSave,
 }) => {
-  const [titleInput, setTitleInput] = useState(plannerTitle ?? ""); // 제목 입력 필드 상태
-  const [savedPlans, setSavedPlans] = useState([]); // 서버에 저장된 TodayPlan 목록 캐시
+  const [titleInput, setTitleInput] = useState(plannerTitle ?? "");
+  const [savedPlans, setSavedPlans] = useState([]);
 
   useEffect(() => {
     let active = true;
 
     const fetchSavedPlans = async () => {
-      // 플래너 번호가 없으면 저장된 일정이 없다고 판단하고 초기화
       if (plannerNo === undefined || plannerNo === null) {
         setSavedPlans([]);
         return;
       }
 
       try {
-        // 선택된 플래너 번호로 TodayPlan을 조회
         const data = await getTodayPlansByPlanner(plannerNo);
         if (!active) return;
 
-        // API 응답 형식이 다양할 수 있어 여러 형태를 안전하게 파싱
         const planList = (() => {
           if (Array.isArray(data)) return data;
           if (Array.isArray(data?.content)) return data.content;
@@ -57,7 +39,6 @@ const PlannerSidebar = ({
           return [];
         })();
 
-        // 서버에서 가져온 일정에 __source 플래그를 붙여 저장됨/임시 여부 구분
         setSavedPlans(
           planList.map((plan) => ({
             ...plan,
@@ -76,17 +57,14 @@ const PlannerSidebar = ({
     fetchSavedPlans();
 
     return () => {
-      // 비동기 처리 후 언마운트 상황 방지
       active = false;
     };
   }, [plannerNo]);
 
   useEffect(() => {
-    // 상위에서 플래너 제목이 변경될 때 입력 필드 동기화
     setTitleInput(plannerTitle ?? "");
   }, [plannerTitle]);
 
-  // 플래너 제목 입력 값 변경 시 상위 콜백에 전달
   const handleChangeTitle = (event) => {
     const nextValue = event.target.value;
     setTitleInput(nextValue);
@@ -95,7 +73,6 @@ const PlannerSidebar = ({
     }
   };
 
-  // 다양한 응답 형태에서 TodayPlan ID를 추출하기 위한 헬퍼
   const resolvePlanId = (plan) =>
     plan?.todayPlanNo ??
     plan?.todayPlanId ??
@@ -107,11 +84,9 @@ const PlannerSidebar = ({
     plan?.clientGeneratedId ??
     null;
 
-  // plan 객체에서 플래너 번호를 안전하게 추출
   const resolvePlannerNo = (plan) =>
     plan?.plannerNo ?? plan?.plannerId ?? plan?.plannerid ?? null;
 
-  // 아직 저장되지 않은 임시 일정(todayPlans) 중 현재 플래너에 해당하는 것만 선별
   const filteredDraftPlans = useMemo(() => {
     if (plannerNo === undefined || plannerNo === null) {
       return todayPlans;
@@ -127,7 +102,6 @@ const PlannerSidebar = ({
     });
   }, [plannerNo, todayPlans]);
 
-  // 서버에서 가져온 저장된 일정 중 현재 플래너에 해당하는 것만 선별
   const filteredSavedPlans = useMemo(() => {
     if (plannerNo === undefined || plannerNo === null) {
       return savedPlans;
@@ -143,7 +117,6 @@ const PlannerSidebar = ({
     });
   }, [plannerNo, savedPlans]);
 
-  // 임시 일정과 저장된 일정을 합치고, 같은 ID가 중복될 경우 하나만 유지
   const combinedPlans = useMemo(() => {
     const decoratedDrafts = filteredDraftPlans.map((plan) => ({
       ...plan,
@@ -172,7 +145,6 @@ const PlannerSidebar = ({
     });
   }, [filteredDraftPlans, filteredSavedPlans]);
 
-  // UI에서 바로 사용할 수 있도록 제목/주소/이미지 등 표시용 필드 구성
   const normalizedPlans = useMemo(
     () =>
       combinedPlans.map((plan) => {
@@ -193,7 +165,6 @@ const PlannerSidebar = ({
     [combinedPlans]
   );
 
-  // 날짜 문자열을 Date 객체로 변환하되 잘못된 포맷은 null 처리
   const parseDateValue = (value) => {
     if (!value) return null;
 
@@ -212,7 +183,6 @@ const PlannerSidebar = ({
     return null;
   };
 
-  // 플래너 시작일을 00:00 시점으로 맞춰 그룹핑 기준일 계산
   const startDateBase = useMemo(() => {
     const parsed = parseDateValue(plannerStartday);
     if (!parsed) return null;
@@ -221,7 +191,6 @@ const PlannerSidebar = ({
     return midnight;
   }, [plannerStartday]);
 
-  // 플래너 종료일을 00:00 기준으로 계산해 마지막 일차를 제한
   const endDateBase = useMemo(() => {
     const parsed = parseDateValue(plannerEndday);
     if (!parsed) return null;
@@ -230,10 +199,8 @@ const PlannerSidebar = ({
     return midnight;
   }, [plannerEndday]);
 
-  // 하루를 밀리초로 환산한 상수 (일차 계산용)
   const msPerDay = 1000 * 60 * 60 * 24;
 
-  // 일차가 범위를 벗어나지 않도록 0 ~ (여행일수-1) 사이로 보정
   const clampDayIndex = (dayIndex) => {
     if (dayIndex === null || dayIndex === undefined || Number.isNaN(dayIndex)) {
       return 0;
@@ -258,11 +225,9 @@ const PlannerSidebar = ({
     return clamped;
   };
 
-  // 일정에서 날짜 정보 추출 (시작 시간이 우선)
   const getPlanDate = (plan) =>
     parseDateValue(plan?.startAt ?? plan?.todayPlanDate ?? plan?.date ?? null);
 
-  // 그룹 헤더에 표시할 월/일 라벨 생성
   const formatDateLabel = (date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
       return "날짜 미지정";
@@ -273,7 +238,6 @@ const PlannerSidebar = ({
     return `${month}/${day}`;
   };
 
-  // 일정 목록을 날짜 기준으로 정렬 후 일차별로 묶어 UI에 전달
   const groupedPlans = useMemo(() => {
     const sortedPlans = [...normalizedPlans].sort((a, b) => {
       const dateA = getPlanDate(a);
@@ -295,9 +259,7 @@ const PlannerSidebar = ({
 
     sortedPlans.forEach((plan) => {
       const planDate = getPlanDate(plan);
-      const planMidnight = planDate
-        ? new Date(planDate.setHours(0, 0, 0, 0))
-        : null;
+      const planMidnight = planDate ? new Date(planDate.setHours(0, 0, 0, 0)) : null;
 
       let dayIndex = 0;
       if (planMidnight && startDateBase) {
@@ -322,7 +284,6 @@ const PlannerSidebar = ({
     return Array.from(groupMap.values()).sort((a, b) => a.dayIndex - b.dayIndex);
   }, [normalizedPlans, startDateBase, endDateBase]);
 
-  // 임시 일정 삭제 요청을 상위 콜백으로 전달
   const handleRemovePlan = (plan) => {
     const planId = resolvePlanId(plan);
     if (typeof onRemove === "function") {
@@ -330,7 +291,6 @@ const PlannerSidebar = ({
     }
   };
 
-  // 삭제 버튼 클릭 시 TodayPlan을 제거 (플래너 번호가 일치할 때만 수행)
   const handleDeletePlan = async (event, plan) => {
     event.stopPropagation();
 
@@ -380,7 +340,6 @@ const PlannerSidebar = ({
     }
   };
 
-  // 사이드바 아이템 클릭 시 상세 패널에 표시할 일정 선택
   const handleSelectPlan = (plan) => {
     if (typeof onSelectPlan !== "function") {
       return;
@@ -389,7 +348,6 @@ const PlannerSidebar = ({
     onSelectPlan(plan);
   };
 
-  // 현재 선택된 일정인지 여부를 비교해 강조 스타일 적용
   const isPlanSelected = (planId) => {
     if (selectedPlanId === undefined || selectedPlanId === null) {
       return false;
@@ -399,149 +357,95 @@ const PlannerSidebar = ({
   };
 
   return (
-    <Paper
-      elevation={3}
-      sx={{
-        width: 340,
-        p: 3,
-        bgcolor: "#d0f0ff",
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-      }}
-    >
-      <Stack direction="row" spacing={1} alignItems="center">
-        <TextField
-          label="플래너 제목"
-          value={titleInput}
-          onChange={handleChangeTitle}
-          size="small"
-          fullWidth
-        />
-        <Button
-          variant="contained"
+    <aside className="flex h-full min-h-[360px] flex-col rounded-3xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+      <div className="flex items-center gap-3">
+        <div className="flex-1">
+          <label className="text-xs font-semibold text-gray-500">플래너 제목</label>
+          <input
+            value={titleInput}
+            onChange={handleChangeTitle}
+            className="mt-1 w-full rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800 outline-none transition focus:border-gray-400 focus:bg-white"
+          />
+        </div>
+        <button
+          type="button"
           onClick={onSave}
-          sx={{
-            backgroundColor: "#3a8d97",
-            "&:hover": { backgroundColor: "#2e7078" },
-            color: "#fff",
-            whiteSpace: "nowrap",
-          }}
+          className="mt-5 whitespace-nowrap rounded-2xl bg-gray-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:opacity-90"
         >
           저장
-        </Button>
-      </Stack>
+        </button>
+      </div>
 
-      <Divider />
+      <div className="my-4 h-px w-full bg-gray-100" />
 
-      <Box>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-          오늘의 일정
-        </Typography>
+      <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-y-auto pr-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-900">오늘의 일정</p>
+          <span className="text-xs font-medium text-emerald-600">{normalizedPlans.length}개</span>
+        </div>
+
         {normalizedPlans.length === 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            추가한 일정이 없습니다. 검색 결과에서 "추가" 버튼을 눌러 일정을
-            등록하세요.
-          </Typography>
+          <p className="rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500">
+            추가한 일정이 없습니다. 검색 결과에서 "추가" 버튼을 눌러 일정을 등록하세요.
+          </p>
         ) : (
-          <Stack spacing={2}>
+          <div className="space-y-4">
             {groupedPlans.map((group) => (
-              <Box key={group.dayIndex}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 700, mb: 1, color: "#3a8d97" }}
-                >
+              <div key={group.dayIndex} className="space-y-2">
+                <p className="text-xs font-bold text-emerald-700">
                   {group.dayIndex + 1}일차 ({formatDateLabel(group.date)})
-                </Typography>
-                <Stack spacing={1}>
+                </p>
+                <div className="space-y-2">
                   {group.plans.map((plan) => {
                     const planId = plan.__display.id;
                     const isSelected = isPlanSelected(planId);
                     return (
-                      <Paper
+                      <div
                         key={planId ?? plan.__display.title}
-                        variant={isSelected ? "elevation" : "outlined"}
-                        elevation={isSelected ? 6 : 0}
                         onClick={() => handleSelectPlan(plan)}
-                        sx={{
-                          p: 1.5,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 1,
-                          cursor: "pointer",
-                          transition:
-                            "background-color 0.2s ease, box-shadow 0.2s ease",
-                          bgcolor: isSelected
-                            ? "rgba(58, 141, 151, 0.16)"
-                            : "inherit",
-                          borderColor: isSelected ? "#3a8d97" : undefined,
-                          "&:hover": {
-                            bgcolor: "rgba(58, 141, 151, 0.08)",
-                          },
-                        }}
+                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-2xl border px-3 py-2 shadow-sm transition hover:bg-gray-50 ${
+                          isSelected
+                            ? "border-emerald-500 bg-emerald-50 shadow"
+                            : "border-gray-100 bg-white"
+                        }`}
                       >
-                        <Stack
-                          direction="row"
-                          spacing={1.5}
-                          sx={{ flex: 1, minWidth: 0 }}
-                        >
-                          {plan.__display.image && (
-                            <Avatar
-                              src={plan.__display.image}
-                              alt={plan.__display.title}
-                              variant="rounded"
-                              sx={{ width: 48, height: 48 }}
-                            />
+                        {plan.__display.image ? (
+                          <img
+                            src={plan.__display.image}
+                            alt={plan.__display.title}
+                            className="h-12 w-12 flex-shrink-0 rounded-xl object-cover"
+                          />
+                        ) : (
+                          <div className="h-12 w-12 flex-shrink-0 rounded-xl bg-gray-100" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-gray-900">
+                            {plan.__display.title}
+                          </p>
+                          <p className="text-[11px] font-medium text-gray-500">
+                            {plan.__display.sourceLabel}
+                          </p>
+                          {plan.__display.address && (
+                            <p className="truncate text-xs text-gray-500">{plan.__display.address}</p>
                           )}
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography
-                              variant="body1"
-                              sx={{
-                                fontWeight: 600,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                            >
-                              {plan.__display.title}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {plan.__display.sourceLabel}
-                            </Typography>
-                            {plan.__display.address && (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {plan.__display.address}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Stack>
-                        <Button
-                          variant="contained"
-                          color="error"
-                          size="small"
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-xl bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-100"
                           onClick={(event) => handleDeletePlan(event, plan)}
                         >
                           삭제
-                        </Button>
-                      </Paper>
+                        </button>
+                      </div>
                     );
                   })}
-                </Stack>
-              </Box>
+                </div>
+              </div>
             ))}
-          </Stack>
+          </div>
         )}
-      </Box>
-    </Paper>
+      </div>
+    </aside>
   );
 };
 
