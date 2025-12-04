@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, Button, TextField, Box, Paper, List, ListItem } from "@mui/material";
+// 로그인 후 상단 네비게이션 바 컴포넌트 - 로고, 검색, 사용자 메뉴를 표시
 import { useNavigate } from "react-router-dom";
 import LogOutButton from "./LogoutButton";
 import { useState, useEffect } from "react";
@@ -10,7 +10,6 @@ const Navbar = () => {
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState([]);
 
-  // 디바운스된 함수
   const debouncedSearch = _.debounce(async (query) => {
     if (query.trim() === "") {
       setSuggestions([]);
@@ -22,57 +21,83 @@ const Navbar = () => {
     } catch (err) {
       console.error("검색 실패:", err);
     }
-  }, 300); // 300ms 딜레이
+  }, 300);
 
   useEffect(() => {
     debouncedSearch(search);
-    return debouncedSearch.cancel; // cleanup
+    return debouncedSearch.cancel;
   }, [search]);
 
   const handleSelect = (album) => {
-    // 예시로 album name을 쿼리파라미터로 보냄
     navigate(`/album/detail/${encodeURIComponent(album.albumName)}`);
     setSearch("");
     setSuggestions([]);
   };
 
   return (
-    <AppBar position="sticky" sx={{ backgroundColor: "#000" }}>
-      <Toolbar>
-        <Button color="inherit" onClick={() => navigate("/main/plan")}>Home</Button>
-        <Button color="inherit">KADR25</Button>
-        
-        <Box position="relative" ml={2}>
-          <TextField
-            variant="outlined"
+    <header className="sticky top-0 z-30 w-full border-b bg-white/90 backdrop-blur">
+      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded-full bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+            onClick={() => navigate("/main/plan")}
+          >
+            Home
+          </button>
+          <span className="text-sm font-semibold text-gray-800">KADR25</span>
+        </div>
+
+        <div className="relative hidden flex-1 items-center justify-center px-6 sm:flex">
+          <input
+            className="w-full max-w-lg rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm outline-none transition focus:border-gray-400 focus:bg-white"
             placeholder="Search Album..."
-            size="small"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            sx={{ backgroundColor: "white", borderRadius: 1, width: "300px" }}
           />
           {suggestions.length > 0 && (
-            <Paper
-              sx={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10 }}
-              elevation={3}
-            >
-              <List>
+            <div className="absolute left-1/2 top-12 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
+              <ul className="divide-y divide-gray-100">
                 {suggestions.map((item) => (
-                  <ListItem button key={item.id} onClick={() => handleSelect(item)}>
+                  <li
+                    key={item.id}
+                    className="cursor-pointer px-4 py-3 text-sm text-gray-700 transition hover:bg-gray-50"
+                    onClick={() => handleSelect(item)}
+                  >
                     {item.albumName} - {item.artistName}
-                  </ListItem>
+                  </li>
                 ))}
-              </List>
-            </Paper>
+              </ul>
+            </div>
           )}
-        </Box>
+        </div>
 
-        <Button color="inherit" sx={{ marginLeft: "20px" }} onClick={() => navigate("/user/qualityReviewerAward")}>Quality Reviewer Award</Button>
-        <Button color="inherit" onClick={() => navigate("/user/userInfo")}>User Info</Button>
-        <Button color="inherit" onClick={() => navigate("/album/regist")}>앨범등록</Button>
-        <LogOutButton />
-      </Toolbar>
-    </AppBar>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100"
+            onClick={() => navigate("/user/qualityReviewerAward")}
+          >
+            Quality Reviewer Award
+          </button>
+          <button
+            type="button"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100"
+            onClick={() => navigate("/user/userInfo")}
+          >
+            User Info
+          </button>
+          <button
+            type="button"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100"
+            onClick={() => navigate("/album/regist")}
+          >
+            앨범등록
+          </button>
+          <LogOutButton />
+        </div>
+      </div>
+    </header>
   );
 };
 

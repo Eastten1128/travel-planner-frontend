@@ -1,19 +1,16 @@
-import { Box, Typography, Link } from "@mui/material";
-
+// 하단 푸터 컴포넌트 - 서비스 정보와 링크를 노출
 const Footer = () => {
   return (
-    <Box component="footer" textAlign="center" py={3} bgcolor="#000">
-      <Link
+    <footer className="border-t bg-gray-50 py-6 text-center text-sm text-gray-500">
+      <a
         href="https://pinlib.tistory.com"
-        color="white"
-        underline="hover"
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
+        className="font-semibold text-gray-700 transition hover:text-gray-900"
       >
-        <Typography variant="caption">PINLIB STUDIO</Typography>
-
-      </Link>
-    </Box>
+        PINLIB STUDIO
+      </a>
+    </footer>
   );
 };
 
