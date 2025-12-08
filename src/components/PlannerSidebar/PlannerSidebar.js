@@ -323,6 +323,25 @@ const PlannerSidebar = ({
       }));
   }, [normalizedPlans, startDateBase, endDateBase]);
 
+  // 현재 플래너에 포함된 todayPlan들의 예산(budget_amount 등)을 숫자로 변환해 합산
+  const getBudgetValue = (plan) => {
+    const raw =
+      plan?.budgetAmount ?? plan?.budget_amount ?? plan?.budget ?? null;
+
+    if (raw == null) return 0;
+
+    const num = Number(raw);
+    return Number.isNaN(num) ? 0 : num;
+  };
+
+  const totalBudget = useMemo(
+    () =>
+      groupedPlans
+        .flatMap((group) => group.plans)
+        .reduce((sum, plan) => sum + getBudgetValue(plan), 0),
+    [groupedPlans]
+  );
+
   const handleRemovePlan = (plan) => {
     const planId = resolvePlanId(plan);
     if (typeof onRemove === "function") {
@@ -422,6 +441,10 @@ const PlannerSidebar = ({
           <p className="text-sm font-semibold text-gray-900">오늘의 일정</p>
           <span className="text-xs font-medium text-emerald-600">{normalizedPlans.length}개</span>
         </div>
+        {/* 합산된 금액을 "(총 예산 : N원)" 형식으로 표시 */}
+        <p className="-mt-1 text-xs font-semibold text-gray-700">
+          (총 예산 : {totalBudget.toLocaleString()}원)
+        </p>
 
         {normalizedPlans.length === 0 ? (
           <p className="rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500">
