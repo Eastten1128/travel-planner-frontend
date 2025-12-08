@@ -45,16 +45,11 @@ const Navbar = () => {
           >
             Home
           </button>
-          <span className="text-sm font-semibold text-gray-800">KADR25</span>
+          <span className="text-sm font-semibold text-gray-800"></span>
         </div>
 
         <div className="relative hidden flex-1 items-center justify-center px-6 sm:flex">
-          <input
-            className="w-full max-w-lg rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm outline-none transition focus:border-gray-400 focus:bg-white"
-            placeholder="Search Album..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          
           {suggestions.length > 0 && (
             <div className="absolute left-1/2 top-12 w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg">
               <ul className="divide-y divide-gray-100">
@@ -73,13 +68,7 @@ const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-gray-800 transition hover:bg-gray-100"
-            onClick={() => navigate("/user/qualityReviewerAward")}
-          >
-            Quality Reviewer Award
-          </button>
+         
           <SignInButton />
         </div>
       </div>

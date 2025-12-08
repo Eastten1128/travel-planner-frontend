@@ -976,7 +976,7 @@ const MainA = () => {
       alert("플래너가 저장되었습니다.");
     } catch (error) {
       console.error("플래너 저장 중 오류:", error);
-      alert("플래너 저장에 성공?했습니다.");
+      alert("플래너 저장에 실패했습니다.");
     }
   };
   // ... (여기까지 로직 동일) ...
