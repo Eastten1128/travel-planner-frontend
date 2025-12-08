@@ -226,7 +226,18 @@ const PlannerSidebar = ({
   };
 
   const getPlanDate = (plan) =>
-    parseDateValue(plan?.startAt ?? plan?.todayPlanDate ?? plan?.date ?? null);
+    parseDateValue(
+      plan?.startAt ?? plan?.start_at ?? plan?.todayPlanDate ?? plan?.date ?? null
+    );
+
+  const isSameDay = (a, b) => {
+    if (!a || !b) return false;
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  };
 
   const formatDateLabel = (date) => {
     if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
@@ -238,50 +249,75 @@ const PlannerSidebar = ({
     return `${month}/${day}`;
   };
 
+  // 플래너의 시작일(planner_startday) ~ 종료일(planner_endday)까지 날짜를 순회하면서
+  // 각 날짜에 해당하는 todayPlan들을 모아 "N일차 (MM/DD)" 단위로 그룹핑하여 렌더링한다.
+  // 같은 날짜에 속한 todayPlan들은 start_at 시간 기준으로 정렬한다.
+
   const groupedPlans = useMemo(() => {
-    const sortedPlans = [...normalizedPlans].sort((a, b) => {
-      const dateA = getPlanDate(a);
-      const dateB = getPlanDate(b);
-
-      if (dateA && dateB) {
-        return dateA.getTime() - dateB.getTime();
+    const plansWithDate = normalizedPlans.map((plan) => {
+      const parsedDate = getPlanDate(plan);
+      const midnight = parsedDate ? new Date(parsedDate) : null;
+      if (midnight) {
+        midnight.setHours(0, 0, 0, 0);
       }
-
-      if (dateA) return -1;
-      if (dateB) return 1;
-
-      const idA = resolvePlanId(a);
-      const idB = resolvePlanId(b);
-      return String(idA ?? "").localeCompare(String(idB ?? ""));
+      return { plan, parsedDate, midnight };
     });
 
-    const groupMap = new Map();
+    // planner_startday ~ planner_endday 가 있는 정상 케이스
+    if (startDateBase && endDateBase) {
+      const results = [];
 
-    sortedPlans.forEach((plan) => {
-      const planDate = getPlanDate(plan);
-      const planMidnight = planDate ? new Date(planDate.setHours(0, 0, 0, 0)) : null;
+      for (
+        let dateCursor = new Date(startDateBase), dayIndex = 0;
+        dateCursor <= endDateBase;
+        dateCursor = new Date(dateCursor.getTime() + msPerDay), dayIndex += 1
+      ) {
+        const dayPlans = plansWithDate
+          .filter(({ parsedDate }) => isSameDay(parsedDate, dateCursor))
+          .sort((a, b) => {
+            const timeA = a.parsedDate ? a.parsedDate.getTime() : 0;
+            const timeB = b.parsedDate ? b.parsedDate.getTime() : 0;
+            return timeA - timeB;
+          })
+          .map(({ plan }) => plan);
 
-      let dayIndex = 0;
-      if (planMidnight && startDateBase) {
-        dayIndex = Math.floor(
-          (planMidnight.getTime() - startDateBase.getTime()) / msPerDay
-        );
+        if (dayPlans.length > 0) {
+          results.push({
+            dayIndex,
+            date: new Date(dateCursor),
+            plans: dayPlans,
+          });
+        }
       }
 
-      dayIndex = clampDayIndex(dayIndex);
+      return results;
+    }
 
-      if (!groupMap.has(dayIndex)) {
-        groupMap.set(dayIndex, {
-          dayIndex,
-          date: planMidnight ?? startDateBase ?? null,
-          plans: [],
-        });
+    // planner_startday / endday 가 없을 때 fallback: 날짜별로 묶어서 정렬
+    const fallbackMap = new Map();
+    plansWithDate.forEach(({ plan, parsedDate, midnight }) => {
+      const key = midnight ? midnight.getTime() : "unknown";
+      if (!fallbackMap.has(key)) {
+        fallbackMap.set(key, { date: midnight, plans: [] });
       }
-
-      groupMap.get(dayIndex).plans.push(plan);
+      fallbackMap.get(key).plans.push(plan);
     });
 
-    return Array.from(groupMap.values()).sort((a, b) => a.dayIndex - b.dayIndex);
+    return Array.from(fallbackMap.entries())
+      .sort(([keyA], [keyB]) => {
+        if (keyA === "unknown") return 1;
+        if (keyB === "unknown") return -1;
+        return keyA - keyB;
+      })
+      .map(([, value], idx) => ({
+        dayIndex: clampDayIndex(idx),
+        date: value.date,
+        plans: value.plans.sort((a, b) => {
+          const timeA = getPlanDate(a)?.getTime() ?? 0;
+          const timeB = getPlanDate(b)?.getTime() ?? 0;
+          return timeA - timeB;
+        }),
+      }));
   }, [normalizedPlans, startDateBase, endDateBase]);
 
   const handleRemovePlan = (plan) => {
