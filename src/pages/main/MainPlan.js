@@ -12,7 +12,7 @@ import Navbar from "../../components/Navbar/afterLogin/Navbar_a";
 import Footer from "../../components/Footer/Footer";
 import CreatePlan from "../../components/CreatePlan";
 import client from "../../api/client";
-import { getMyPlanners } from "../../api/planner";
+import { deletePlanner, getMyPlanners } from "../../api/planner";
 
 const MainPlan = () => {
   const location = useLocation();
@@ -29,6 +29,8 @@ const MainPlan = () => {
   useEffect(() => {
     const query = new URLSearchParams(location.search);
     const token = query.get("token");
+
+    
 
     if (token) {
       localStorage.setItem("accessToken", token);
@@ -132,6 +134,36 @@ const MainPlan = () => {
   const highlightedPlanner = useMemo(() => planners[0] || null, [planners]);
   const remainingPlanners = useMemo(() => planners.slice(1), [planners]);
 
+   // 현재 선택된 플래너를 백엔드에 삭제 요청하고,
+  // 삭제 후 플래너 목록과 선택 상태를 초기화하는 핸들러
+  const handleDeletePlanner = useCallback(async () => {
+    const currentPlanner = highlightedPlanner;
+
+    if (!currentPlanner || !currentPlanner.plannerNo) {
+      alert("삭제할 플래너가 선택되지 않았습니다.");
+      return;
+    }
+
+    const plannerNo = currentPlanner.plannerNo;
+
+    const confirmed = window.confirm("현재 플래너를 삭제하시겠습니까?");
+    if (!confirmed) return;
+
+    try {
+      await deletePlanner(plannerNo);
+
+      setPlanners((prev) =>
+        prev.filter((planner) => planner.plannerNo !== plannerNo)
+      );
+
+      alert("플래너가 삭제되었습니다.");
+    } catch (error) {
+      console.error("플래너 삭제 실패:", error);
+      alert("플래너 삭제 중 오류가 발생했습니다.");
+    }
+  }, [highlightedPlanner]);
+
+
   return (
     <>
       <Navbar />
@@ -189,7 +221,13 @@ const MainPlan = () => {
                       >
                         여행 정보 수정
                       </button>
-                     
+                      <button
+                        type="button"
+                        onClick={handleDeletePlanner}
+                        className="mt-2 rounded-2xl bg-red-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-red-600"
+                      >
+                        플래너 삭제
+                      </button>
                     </div>
                   </div>
                 </section>
@@ -197,14 +235,14 @@ const MainPlan = () => {
 
               <section className="rounded-3xl bg-gradient-to-br from-indigo-500 to-blue-500 p-10 text-center shadow-sm">
                 <h3 className="text-2xl font-semibold text-white">AI 추천</h3>
-                <p className="mt-3 text-base text-indigo-100">여행 맞춤 추천을 제공해드릴 예정입니다.</p>
+                <p className="mt-3 text-base text-indigo-100">맞춤 여행지 추천을 제공해드립니다.</p>
                 <button
                   type="button"
                   className="mt-6 rounded-full bg-white/90 px-6 py-2 text-sm font-semibold text-indigo-700 shadow"
                   title="준비 중인 기능입니다."
                   onClick={() => navigate("/chat")}
                 >
-                  AI TEST
+                  AI 추천 플래너 생성하기
                 </button>
               </section>
 

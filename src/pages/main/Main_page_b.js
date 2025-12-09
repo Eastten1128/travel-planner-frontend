@@ -6,6 +6,7 @@ import PlannerSidebar from "../../components/PlannerSidebar/PlannerSidebar";
 import SearchComponent from "../../components/Search/SearchComponent";
 import GoogleMap from "../../components/Map/GoogleMap";
 import TodayPlanDetailComponent from "./components/TodayPlanDetailComponent";
+import handleLoginClick from "../../utils/handleLoginClick";
 
 const MainB = () => {
   const [todayPlans, setTodayPlans] = useState([]);
@@ -20,64 +21,38 @@ const MainB = () => {
     alert("로그인 후 일정을 저장할 수 있습니다.");
   };
 
+  const dologinClick = () => {
+    // Spring Security가 제공하는 Google OAuth2 로그인 URL
+    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+  }
+
   return (
     <>
       <Navbar />
       <main className="flex min-h-screen flex-col bg-gray-100">
-        <div className="flex flex-1 flex-col gap-4 px-4 py-6 lg:px-8">
-          <div className="flex flex-1 flex-col gap-4 lg:flex-row">
-            <div className="flex flex-col gap-4 lg:basis-[30%] lg:max-w-[32%]">
-              <div className="flex-1">
-                <PlannerSidebar
-                  plannerTitle="나의 여행 플래너"
-                  todayPlans={todayPlans}
-                  onTitleChange={() => {}}
-                  plannerNo={null}
-                  onSelectPlan={(plan) => setSelectedPlan(plan)}
-                  selectedPlanId={selectedPlan?.id}
-                  onRemove={(planId) =>
-                    setTodayPlans((prev) => prev.filter((plan) => plan.id !== planId))
-                  }
-                  onSave={handleSavePlan}
-                />
-              </div>
+        <div className="min-h-screen flex items-center bg-white">
+  <div className="mx-auto px-10">
+    {/* 메인 타이틀 */}
+    <h1 className="text-5xl md:text-6xl font-extrabold leading-snug text-black">
+      기존에 경험하지 못한
+      <br />
+      새로운 여행 플래너
+    </h1>
 
-              <div className="flex-1">
-                <SearchComponent onAddPlan={handleAddPlan} />
-              </div>
-            </div>
+    {/* 서브 문구 */}
+    <p className="mt-6 text-sm md:text-base text-gray-500">
+      고민만 하던 여행 계획을 <span className="font-semibold">플래너</span>를 통해 몇 분 만에 스케줄링 해보세요.
+    </p>
 
-            <div className="relative flex flex-1 basis-[70%] overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 lg:p-6 lg:min-h-[520px]">
-              <div className="flex w-full flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-gray-900">지도</h2>
-                </div>
-                <div className="relative flex-1 overflow-hidden rounded-2xl bg-gray-50 shadow-inner">
-                  <GoogleMap query={selectedPlan?.title || "Seoul"} height="100%" />
-                </div>
-              </div>
-
-              <div className="absolute right-4 top-4 z-20 w-full max-w-md">
-                {selectedPlan ? (
-                  <TodayPlanDetailComponent
-                    place={selectedPlan}
-                    onSave={handleSavePlan}
-                    onCancel={() => setSelectedPlan(null)}
-                    plannerStartday={null}
-                    plannerEndday={null}
-                  />
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-amber-200 bg-amber-50/90 p-4 text-sm shadow-sm">
-                    <p className="text-base font-semibold text-amber-900">일정 상세 정보</p>
-                    <p className="mt-1 text-amber-700">
-                      검색을 통해 추가한 일정을 여기에서 확인하고 수정할 수 있습니다.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+    {/* 버튼 */}
+    <button className="mt-10 inline-block bg-black text-white px-8 py-3 text-sm md:text-base font-semibold"
+    onClick={dologinClick}
+    >
+      플래너 시작하기
+    </button>
+  </div>
+</div>
+        
       </main>
       <Footer />
     </>

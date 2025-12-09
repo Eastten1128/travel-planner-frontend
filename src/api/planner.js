@@ -43,4 +43,7 @@ export const getMyPlanners = async (options = {}) => {
   return response.data;
 };
 
+export const deletePlanner = (plannerNo) =>
+  client.delete(`/api/planners/${plannerNo}`);
+
 

@@ -249,10 +249,18 @@ const PlannerSidebar = ({
     return `${month}/${day}`;
   };
 
+  const formatTimeHM = (value) => {
+    const parsed = parseDateValue(value);
+    if (!parsed) return null;
+
+    const hours = String(parsed.getHours()).padStart(2, "0");
+    const minutes = String(parsed.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   // 플래너의 시작일(planner_startday) ~ 종료일(planner_endday)까지 날짜를 순회하면서
   // 각 날짜에 해당하는 todayPlan들을 모아 "N일차 (MM/DD)" 단위로 그룹핑하여 렌더링한다.
   // 같은 날짜에 속한 todayPlan들은 start_at 시간 기준으로 정렬한다.
-
   const groupedPlans = useMemo(() => {
     const plansWithDate = normalizedPlans.map((plan) => {
       const parsedDate = getPlanDate(plan);
@@ -260,13 +268,13 @@ const PlannerSidebar = ({
       if (midnight) {
         midnight.setHours(0, 0, 0, 0);
       }
+
       return { plan, parsedDate, midnight };
     });
 
-    // planner_startday ~ planner_endday 가 있는 정상 케이스
-    if (startDateBase && endDateBase) {
-      const results = [];
+    const results = [];
 
+    if (startDateBase && endDateBase) {
       for (
         let dateCursor = new Date(startDateBase), dayIndex = 0;
         dateCursor <= endDateBase;
@@ -282,18 +290,13 @@ const PlannerSidebar = ({
           .map(({ plan }) => plan);
 
         if (dayPlans.length > 0) {
-          results.push({
-            dayIndex,
-            date: new Date(dateCursor),
-            plans: dayPlans,
-          });
+          results.push({ dayIndex, date: new Date(dateCursor), plans: dayPlans });
         }
       }
 
       return results;
     }
 
-    // planner_startday / endday 가 없을 때 fallback: 날짜별로 묶어서 정렬
     const fallbackMap = new Map();
     plansWithDate.forEach(({ plan, parsedDate, midnight }) => {
       const key = midnight ? midnight.getTime() : "unknown";
@@ -319,6 +322,25 @@ const PlannerSidebar = ({
         }),
       }));
   }, [normalizedPlans, startDateBase, endDateBase]);
+
+  // 현재 플래너에 포함된 todayPlan들의 예산(budget_amount 등)을 숫자로 변환해 합산
+  const getBudgetValue = (plan) => {
+    const raw =
+      plan?.budgetAmount ?? plan?.budget_amount ?? plan?.budget ?? null;
+
+    if (raw == null) return 0;
+
+    const num = Number(raw);
+    return Number.isNaN(num) ? 0 : num;
+  };
+
+  const totalBudget = useMemo(
+    () =>
+      groupedPlans
+        .flatMap((group) => group.plans)
+        .reduce((sum, plan) => sum + getBudgetValue(plan), 0),
+    [groupedPlans]
+  );
 
   const handleRemovePlan = (plan) => {
     const planId = resolvePlanId(plan);
@@ -419,6 +441,10 @@ const PlannerSidebar = ({
           <p className="text-sm font-semibold text-gray-900">오늘의 일정</p>
           <span className="text-xs font-medium text-emerald-600">{normalizedPlans.length}개</span>
         </div>
+        {/* 합산된 금액을 "(총 예산 : N원)" 형식으로 표시 */}
+        <p className="-mt-1 text-xs font-semibold text-gray-700">
+          (총 예산 : {totalBudget.toLocaleString()}원)
+        </p>
 
         {normalizedPlans.length === 0 ? (
           <p className="rounded-2xl bg-gray-50 px-4 py-3 text-xs text-gray-500">
@@ -434,6 +460,8 @@ const PlannerSidebar = ({
                 <div className="space-y-2">
                   {group.plans.map((plan) => {
                     const planId = plan.__display.id;
+                    const startLabel = formatTimeHM(plan.startAt ?? plan.start_at);
+                    const endLabel = formatTimeHM(plan.endAt ?? plan.end_at);
                     const isSelected = isPlanSelected(planId);
                     return (
                       <div
@@ -458,6 +486,12 @@ const PlannerSidebar = ({
                           <p className="truncate text-sm font-semibold text-gray-900">
                             {plan.__display.title}
                           </p>
+                          {/* 일정의 시작/종료 시간을 "HH:MM ~ HH:MM" 형식으로 표시 */}
+                          {startLabel && endLabel && (
+                            <p className="text-[11px] font-medium text-gray-700">
+                              {startLabel} ~ {endLabel}
+                            </p>
+                          )}
                           <p className="text-[11px] font-medium text-gray-500">
                             {plan.__display.sourceLabel}
                           </p>
