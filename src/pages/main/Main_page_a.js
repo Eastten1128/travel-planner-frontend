@@ -347,6 +347,51 @@ const normalizeCoordinate = (value) => {
   return numeric;
 };
 
+const resolveLatLngFromPlan = (plan) => {
+  if (!plan) return null;
+
+  const lat =
+    normalizeCoordinate(plan.latitude) ??
+    normalizeCoordinate(plan.lat) ??
+    normalizeCoordinate(plan.mapY) ??
+    normalizeCoordinate(plan.mapy) ??
+    normalizeCoordinate(plan.y) ??
+    normalizeCoordinate(plan.locationY) ??
+    null;
+
+  const lng =
+    normalizeCoordinate(plan.longitude) ??
+    normalizeCoordinate(plan.lng) ??
+    normalizeCoordinate(plan.mapX) ??
+    normalizeCoordinate(plan.mapx) ??
+    normalizeCoordinate(plan.x) ??
+    normalizeCoordinate(plan.locationX) ??
+    null;
+
+  if (lat === null || lng === null) {
+    return null;
+  }
+
+  return { lat, lng };
+};
+
+const resolveStartDateTimeValue = (plan) =>
+  plan?.startAtDateTime ?? plan?.startAt ?? plan?.start_at ?? plan?.startTime ?? null;
+
+const getStartAtTimestamp = (plan) => {
+  const raw = resolveStartDateTimeValue(plan);
+  if (!raw) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return parsed.getTime();
+};
+
 const MainA = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -357,6 +402,7 @@ const MainA = () => {
   const [currentPlanner, setCurrentPlanner] = useState(null); // 선택된 플래너 정보
   const [selectedPlan, setSelectedPlan] = useState(null); // 상세 패널에 표시 중인 일정
   const [detailOpen, setDetailOpen] = useState(false); // 상세 패널 표시 여부
+  const [routeRequest, setRouteRequest] = useState(null); // 지도에 전달할 경로 요청 정보
   const [currentUserId, setCurrentUserId] = useState(null); // 로그인한 사용자 ID
   const {plannerNo} = useParams();
   // 현재 플래너에 저장된 TodayPlan 목록을 서버에서 가져와 상태에 반영한다.
@@ -579,6 +625,37 @@ const MainA = () => {
   const handleGoToAdditionalInfo = () => {
     setOpenModal(false);
     navigate("/additional-info");
+  };
+
+  const handleShowRoute = () => {
+    const candidates = todayPlans
+      .map((plan) => ({ plan, coords: resolveLatLngFromPlan(plan) }))
+      .filter((item) => item.coords);
+
+    if (candidates.length < 2) {
+      alert("경로를 표시하려면 두 개 이상의 장소가 필요합니다.");
+      setRouteRequest(null);
+      return;
+    }
+
+    const sortedByStartTime = [...candidates].sort(
+      (a, b) => getStartAtTimestamp(a.plan) - getStartAtTimestamp(b.plan)
+    );
+
+    const origin = sortedByStartTime[0].coords;
+    const destination = sortedByStartTime[sortedByStartTime.length - 1].coords;
+    const waypoints = sortedByStartTime.slice(1, -1).map(({ coords }) => ({
+      location: coords,
+      stopover: true,
+    }));
+
+    // todayPlan의 start_at 순서를 유지한 동선으로 origin/destination/waypoints 구성
+    setRouteRequest({
+      origin,
+      destination,
+      waypoints,
+      travelMode: "DRIVING",
+    });
   };
 
   // 검색 결과/임시 데이터를 받아 TodayPlan 형태로 정규화 후 목록에 추가
@@ -1020,13 +1097,21 @@ const MainA = () => {
 
             <div className="relative flex flex-1 basis-[70%] overflow-hidden rounded-3xl bg-white p-4 shadow-sm ring-1 ring-gray-100 lg:p-6 lg:min-h-[560px]">
               <div className="flex w-full flex-col gap-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <h2 className="text-xl font-bold text-gray-900">지도</h2>
+                  <button
+                    type="button"
+                    onClick={handleShowRoute}
+                    className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                  >
+                    경로 보기
+                  </button>
                 </div>
                 <div className="relative flex-1 overflow-hidden rounded-2xl bg-gray-50 shadow-inner">
                   <GoogleMap
                     query={selectedPlan?.placeName || selectedPlan?.title || "Seoul"}
                     height="100%"
+                    routeRequest={routeRequest}
                   />
                 </div>
               </div>
