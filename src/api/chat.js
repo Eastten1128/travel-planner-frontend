@@ -3,7 +3,7 @@
 import axios from "axios";
 
 const chatApi = axios.create({
-  baseURL: "http://localhost:8080/api/chat",
+  baseURL: "https://sw6885travelplannerfin.uk/api/chat",
 });
 
 // JWT 자동 포함

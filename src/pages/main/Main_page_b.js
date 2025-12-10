@@ -6,7 +6,7 @@ import PlannerSidebar from "../../components/PlannerSidebar/PlannerSidebar";
 import SearchComponent from "../../components/Search/SearchComponent";
 import GoogleMap from "../../components/Map/GoogleMap";
 import TodayPlanDetailComponent from "./components/TodayPlanDetailComponent";
-import handleLoginClick from "../../utils/handleLoginClick";
+//import handleLoginClick from "../../utils/handleLoginClick";
 
 const MainB = () => {
   const [todayPlans, setTodayPlans] = useState([]);
@@ -23,7 +23,7 @@ const MainB = () => {
 
   const dologinClick = () => {
     // Spring Security가 제공하는 Google OAuth2 로그인 URL
-    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+    window.location.href = "https://sw6885travelplannerfin.uk/oauth2/authorization/google";
   }
 
   return (

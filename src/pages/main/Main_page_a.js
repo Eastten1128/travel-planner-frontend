@@ -548,7 +548,7 @@ const MainA = () => {
       const savedToken = localStorage.getItem("accessToken");
       if (!savedToken) {
         alert("로그인이 필요합니다.");
-        navigate("/login");
+        navigate("/main_b");
         return;
       }
 
@@ -568,7 +568,7 @@ const MainA = () => {
         console.log("요청 시 보낸 토큰:", savedToken);
         console.error("유저 정보 요청 실패:", error);
         alert("로그인 정보가 유효하지 않습니다.");
-        navigate("/login");
+        navigate("/main_b");
       }
     };
 
