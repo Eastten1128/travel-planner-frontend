@@ -41,7 +41,7 @@ const MainPlan = () => {
     const savedToken = localStorage.getItem("accessToken");
     if (!savedToken) {
       alert("로그인이 필요합니다.");
-      navigate("/login");
+      navigate("/main_b");
       return;
     }
 
@@ -67,7 +67,7 @@ const MainPlan = () => {
         const status = err?.response?.status;
         if (status === 401 || status === 403) {
           alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
-          navigate("/login");
+          navigate("/main_b");
           return;
         }
         console.error("사용자 정보 조회 실패:", err);
@@ -91,7 +91,7 @@ const MainPlan = () => {
         const status = err?.response?.status;
         if (status === 401 || status === 403) {
           alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
-          navigate("/login");
+          navigate("/main_b");
           return;
         }
         console.error("플래너 목록 조회 실패:", err);

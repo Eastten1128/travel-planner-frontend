@@ -3,7 +3,7 @@ import { Button } from "@mui/material";
 const SignInButton = () => {
   const handleLoginClick = () => {
     // Spring Security가 제공하는 Google OAuth2 로그인 URL
-    window.location.href = "http://localhost:8080/oauth2/authorization/google";
+    window.location.href = "https://sw6885travelplannerfin.uk/oauth2/authorization/google";
     //window.location.href = "http://localhost:8080/api/auth/google";
   };
 

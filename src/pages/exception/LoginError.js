@@ -14,7 +14,7 @@ const LoginError = () => {
   return (
     <div>
       <h2>로그인 페이지</h2>
-      <a href="http://localhost:8080/oauth2/authorization/google">
+      <a href="https://sw6885travelplannerfin.uk/oauth2/authorization/google">
         <button>Google로 로그인</button>
       </a>
     </div>

@@ -32,7 +32,7 @@ const AdditionalInfo = () => {
       const status = error?.response?.status;
       if (status === 401 || status === 403) {
         alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
-        navigate("/login");
+        navigate("/main_b");
         return;
       }
       alert("추가 정보 등록에 실패했습니다.");

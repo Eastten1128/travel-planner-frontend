@@ -22,7 +22,7 @@ function SearchComponent({ onAddPlan }) {
     setLoading(true);
 
     axios
-      .get("http://localhost:8080/api/tours/search", {
+      .get("https://sw6885travelplannerfin.uk/api/tours/search", {
         params: {
           keyword: keyword,
         },
